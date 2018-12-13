@@ -803,6 +803,20 @@
 			"revisionTime": "2018-04-16T22:06:43Z"
 		},
 		{
+			"checksumSHA1": "SmjxBKlxa3UCybsDOYgPCJPp+rE=",
+			"origin": "k8s.io/client-go/vendor/golang.org/x/oauth2",
+			"path": "golang.org/x/oauth2",
+			"revision": "ee7a1ba5cdf1292b67a1fdf1fa28f90d2a7b0084",
+			"revisionTime": "2018-11-10T15:08:39Z"
+		},
+		{
+			"checksumSHA1": "BAkyxbaxkrZbzGtfG5iX8v6ypIo=",
+			"origin": "k8s.io/client-go/vendor/golang.org/x/oauth2/internal",
+			"path": "golang.org/x/oauth2/internal",
+			"revision": "ee7a1ba5cdf1292b67a1fdf1fa28f90d2a7b0084",
+			"revisionTime": "2018-11-10T15:08:39Z"
+		},
+		{
 			"checksumSHA1": "su2QDjUzrUO0JnOH9m0cNg0QqsM=",
 			"path": "golang.org/x/sys/unix",
 			"revision": "1b2967e3c290b7c545b3db0deeda16e9be4f98a2",
@@ -1629,6 +1643,12 @@
 			"path": "k8s.io/apimachinery/pkg/util/mergepatch",
 			"revision": "31dade610c053669d8054bfd847da657251e8c1a",
 			"revisionTime": "2018-05-15T14:46:02Z"
+		},
+		{
+			"checksumSHA1": "y1dxj1ipJgt2PRXXSXDmXrSka6A=",
+			"path": "k8s.io/apimachinery/pkg/util/naming",
+			"revision": "2a7c9300402896b3c073f2f47df85527c94f83a0",
+			"revisionTime": "2018-11-10T15:08:39Z"
 		},
 		{
 			"checksumSHA1": "8dB53XLDORkZZKrjQ1/5tyCIeXQ=",
@@ -3017,6 +3037,12 @@
 			"revisionTime": "2018-06-21T15:29:33Z"
 		},
 		{
+			"checksumSHA1": "6DMbz5JnwquAwMbT/w5aYt4D3Hc=",
+			"path": "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
+			"revision": "ee7a1ba5cdf1292b67a1fdf1fa28f90d2a7b0084",
+			"revisionTime": "2018-11-10T15:08:39Z"
+		},
+		{
 			"checksumSHA1": "Mbvnezsq0bnfb8yjUqT9UbKhpuM=",
 			"path": "k8s.io/client-go/pkg/version",
 			"revision": "b0722d92a7c1f91106a7cb0f5437821b5cd51a41",
@@ -3027,6 +3053,12 @@
 			"path": "k8s.io/client-go/plugin/pkg/client/auth/exec",
 			"revision": "b0722d92a7c1f91106a7cb0f5437821b5cd51a41",
 			"revisionTime": "2018-06-21T15:29:33Z"
+		},
+		{
+			"checksumSHA1": "6UrgxolGq1dCPfLS2z6UAqUJzBM=",
+			"path": "k8s.io/client-go/plugin/pkg/client/auth/oidc",
+			"revision": "ee7a1ba5cdf1292b67a1fdf1fa28f90d2a7b0084",
+			"revisionTime": "2018-11-10T15:08:39Z"
 		},
 		{
 			"checksumSHA1": "DY8wdYKM0jvFyJe7yX0PJVFZPvI=",
@@ -3179,6 +3211,12 @@
 			"revisionTime": "2018-06-21T15:29:33Z"
 		},
 		{
+			"checksumSHA1": "KSB22yQOaax0P/RkHCDp80u+Jcs=",
+			"path": "k8s.io/client-go/util/connrotation",
+			"revision": "ee7a1ba5cdf1292b67a1fdf1fa28f90d2a7b0084",
+			"revisionTime": "2018-11-10T15:08:39Z"
+		},
+		{
 			"checksumSHA1": "yXKT7cJNCv5vjwGKhpc/DUsQg+A=",
 			"path": "k8s.io/client-go/util/flowcontrol",
 			"revision": "b0722d92a7c1f91106a7cb0f5437821b5cd51a41",
@@ -3215,6 +3253,12 @@
 			"revisionTime": "2018-06-21T15:29:33Z"
 		},
 		{
+			"checksumSHA1": "faylL3dny3zUIvJduGOFmtzb2Rw=",
+			"path": "k8s.io/klog",
+			"revision": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f",
+			"revisionTime": "2018-11-08T23:46:04Z"
+		},
+		{
 			"checksumSHA1": "YSe5djsFto4XCon1ZM4gdx0wfKs=",
 			"path": "k8s.io/kube-openapi/pkg/builder",
 			"revision": "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2",
@@ -3243,6 +3287,13 @@
 			"path": "k8s.io/kube-openapi/pkg/util/proto",
 			"revision": "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2",
 			"revisionTime": "2018-05-31T20:41:56Z"
+		},
+		{
+			"checksumSHA1": "ppTACDBGGOjmDVwkUlpq87VL1Lk=",
+			"origin": "k8s.io/apimachinery/vendor/sigs.k8s.io/yaml",
+			"path": "sigs.k8s.io/yaml",
+			"revision": "2a7c9300402896b3c073f2f47df85527c94f83a0",
+			"revisionTime": "2018-11-10T15:08:39Z"
 		}
 	],
 	"rootPath": "github.com/nearmap/kcd"
