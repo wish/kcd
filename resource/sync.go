@@ -139,7 +139,7 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		stopper := make(chan struct{})
 		defer close(stopper)
-		s.deploymentInformer.Run(stopper)
+		go s.deploymentInformer.Run(stopper)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
