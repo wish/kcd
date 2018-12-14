@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/informers"
 )
 
 type regRoot struct {
@@ -164,6 +165,9 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		resourceProvider := resource.NewK8sProvider(params.namespace, customCS, workloadProvider)
 
+		deployInformerFactory := informers.NewSharedInformerFactory(k8sClient, time.Second * 30)
+		deployInformer := deployInformerFactory.Apps().V1().Deployments().Informer()
+
 		kcd, err := customCS.CustomV1().KCDs(params.namespace).Get(params.kcdName, metav1.GetOptions{})
 		if err != nil {
 			scStatus = 2
@@ -192,7 +196,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		historyProvider := history.NewProvider(k8sClient, stats)
 
-		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd,
+		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, deployInformer,
 			conf.WithRecorder(recorder), conf.WithStats(stats))
 		if err != nil {
 			glog.Errorf("Failed to create syncer in namespace=%s for kcd name=%s, error=%v",

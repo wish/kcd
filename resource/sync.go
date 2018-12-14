@@ -19,11 +19,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+	appsv1 "k8s.io/api/apps/v1"
+
 )
 
 // Syncer is responsible for handling the main sync loop.
 type Syncer struct {
 	machine *state.Machine
+	deploymentInformer cache.SharedIndexInformer
 
 	kcd *kcd1.KCD
 
@@ -39,7 +43,7 @@ type Syncer struct {
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
 func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, registryProvider registry.Provider,
-	hp history.Provider, kcd *kcd1.KCD, options ...func(*config.Options)) (*Syncer, error) {
+	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, options ...func(*config.Options)) (*Syncer, error) {
 
 	opts := config.NewOptions()
 	for _, opt := range options {
@@ -62,6 +66,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 	s := &Syncer{
 		resourceProvider: resourceProvider,
 		workloadProvider: workloadProvider,
+		deploymentInformer: deployInformer,
 		kcd:              kcd,
 		registryProvider: registryProvider,
 		registry:         registry,
@@ -69,6 +74,11 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		options:          opts,
 	}
 	s.machine = state.NewMachine(s.initialState(), state.WithStartWaitTime(dur), state.WithTimeout(opTimeout))
+
+	s.deploymentInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: s.trackDeployment,
+	})
+
 	return s, nil
 }
 
@@ -127,6 +137,10 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
 
+		stopper := make(chan struct{})
+		defer close(stopper)
+		s.deploymentInformer.Run(stopper)
+
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
 				s.deploy(deployer,
@@ -134,6 +148,8 @@ func (s *Syncer) initialState() state.StateFunc {
 						s.syncVersionConfig(version,
 							s.addHistory(deployer, version,
 								s.updateRolloutStatus(version, StatusSuccess, nil)))))))
+
+		stopper <- struct{}{}
 
 		return state.Single(state.WithFailure(syncState, s.handleFailure(version, deployer)))
 	}
@@ -357,4 +373,27 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 
 		return state.Single(next)
 	}
+}
+
+func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}){
+
+	//oldDeploy, ok := oldObj.(*appsv1.Deployment)
+	//if !ok {
+	//	glog.Errorf("Not a deploy object")
+	//	return
+	//}
+
+	newDeploy, ok := newObj.(*appsv1.Deployment)
+	if !ok {
+		glog.Errorf("Not a deploy object")
+		return
+	}
+
+	glog.Info("----------------   start tracking:    -----------------")
+
+	glog.V(1).Infof("kcd: %v", s.kcd)
+	glog.V(1).Infof("deploy: %v", oldObj)
+
+	glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
+		newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
 }
