@@ -39,6 +39,8 @@ type Syncer struct {
 	registryProvider registry.Provider // used to obtain version information for other registry resoures
 
 	options *config.Options
+
+	stopper chan struct{}
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -79,6 +81,8 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		UpdateFunc: s.trackDeployment,
 	})
 
+	s.stopper = make(chan struct{})
+
 	return s, nil
 }
 
@@ -89,6 +93,7 @@ func (s *Syncer) Start() {
 
 // Stop shuts down the sync operation.
 func (s *Syncer) Stop() error {
+	defer close(s.stopper)
 	return s.machine.Stop()
 }
 
@@ -137,10 +142,8 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
 
-		stopper := make(chan struct{})
-
 		glog.V(1).Infof("deployment informer started")
-		go s.deploymentInformer.Run(stopper)
+		go s.deploymentInformer.Run(s.stopper)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
@@ -149,11 +152,6 @@ func (s *Syncer) initialState() state.StateFunc {
 						s.syncVersionConfig(version,
 							s.addHistory(deployer, version,
 								s.updateRolloutStatus(version, StatusSuccess, nil)))))))
-		defer func() {
-			stopper <- struct{}{}
-			glog.V(1).Infof("deployment informer finished")
-			close(stopper)
-		}()
 
 		return state.Single(state.WithFailure(syncState, s.handleFailure(version, deployer)))
 	}
@@ -348,6 +346,11 @@ func newVersionConfig(namespace, name, key, version string) *corev1.ConfigMap {
 // history provider.
 func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state.State) state.StateFunc {
 	return func(ctx context.Context) (state.States, error) {
+
+		// stopped the deployment informer here
+		s.stopper <- struct{}{}
+		glog.V(1).Info("deployment informer stopped")
+		
 		if !s.kcd.Spec.History.Enabled {
 			glog.V(4).Infof("Not adding version history for kcd=%s, version=%s", s.kcd.Name, version)
 			return state.Single(next)
