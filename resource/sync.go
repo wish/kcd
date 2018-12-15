@@ -138,7 +138,6 @@ func (s *Syncer) initialState() state.StateFunc {
 		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
 
 		stopper := make(chan struct{})
-		defer close(stopper)
 
 		glog.V(1).Infof("deployment informer started")
 		go s.deploymentInformer.Run(stopper)
@@ -150,8 +149,11 @@ func (s *Syncer) initialState() state.StateFunc {
 						s.syncVersionConfig(version,
 							s.addHistory(deployer, version,
 								s.updateRolloutStatus(version, StatusSuccess, nil)))))))
-		stopper <- struct{}{}
-		glog.V(1).Infof("deployment informer finished")
+		defer func() {
+			stopper <- struct{}{}
+			glog.V(1).Infof("deployment informer finished")
+			close(stopper)
+		}()
 
 		return state.Single(state.WithFailure(syncState, s.handleFailure(version, deployer)))
 	}
