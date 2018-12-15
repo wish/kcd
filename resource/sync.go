@@ -139,6 +139,8 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		stopper := make(chan struct{})
 		defer close(stopper)
+
+		glog.V(1).Infof("deployment informer started")
 		go s.deploymentInformer.Run(stopper)
 
 		syncState := s.verify(version,
@@ -148,8 +150,8 @@ func (s *Syncer) initialState() state.StateFunc {
 						s.syncVersionConfig(version,
 							s.addHistory(deployer, version,
 								s.updateRolloutStatus(version, StatusSuccess, nil)))))))
-
 		stopper <- struct{}{}
+		glog.V(1).Infof("deployment informer finished")
 
 		return state.Single(state.WithFailure(syncState, s.handleFailure(version, deployer)))
 	}
