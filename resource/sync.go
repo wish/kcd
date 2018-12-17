@@ -40,7 +40,7 @@ type Syncer struct {
 
 	options *config.Options
 
-	stopper chan struct{}
+	stopper *chan struct{}
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -80,8 +80,8 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 	s.deploymentInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: s.trackDeployment,
 	})
-
-	s.stopper = make(chan struct{})
+	stopper := make(chan struct{})
+	s.stopper = &stopper
 
 	return s, nil
 }
@@ -93,7 +93,7 @@ func (s *Syncer) Start() {
 
 // Stop shuts down the sync operation.
 func (s *Syncer) Stop() error {
-	defer close(s.stopper)
+	defer close(*s.stopper)
 	return s.machine.Stop()
 }
 
@@ -257,7 +257,7 @@ func (s *Syncer) deploy(deployer deploy.Deployer, next state.State) state.StateF
 	return func(ctx context.Context) (state.States, error) {
 		glog.V(4).Info("creating new deployer state")
 		glog.V(1).Infof("deployment informer started")
-		go s.deploymentInformer.Run(s.stopper)
+		go s.deploymentInformer.Run(*s.stopper)
 		return state.Single(deployer.AsState(next))
 	}
 }
@@ -346,7 +346,7 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.stopper <- struct{}{}
+		*s.stopper <- struct{}{}
 		glog.V(1).Info("deployment informer stopped")
 
 		if !s.kcd.Spec.History.Enabled {
