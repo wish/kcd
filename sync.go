@@ -165,7 +165,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		resourceProvider := resource.NewK8sProvider(params.namespace, customCS, workloadProvider)
 
-		deployInformerFactory := informers.NewSharedInformerFactory(k8sClient, time.Second * 30)
+		deployInformerFactory := informers.NewFilteredSharedInformerFactory(k8sClient, time.Second * 30, params.namespace, nil)
 		deployInformer := deployInformerFactory.Apps().V1().Deployments().Informer()
 
 		kcd, err := customCS.CustomV1().KCDs(params.namespace).Get(params.kcdName, metav1.GetOptions{})
