@@ -236,8 +236,6 @@ func (s *Syncer) updateRolloutStatus(version, status string, next state.State) s
 		if version == s.kcd.Status.CurrVersion && status == s.kcd.Status.CurrStatus {
 			return state.Single(next)
 		}
-		glog.V(1).Infof("deployment informer started")
-		go s.deploymentInformer.Run(s.stopper)
 
 		glog.V(2).Infof("Updating rollout status: kcd=%s, version=%s, status=%s", s.kcd.Name, version, status)
 
@@ -258,7 +256,8 @@ func (s *Syncer) updateRolloutStatus(version, status string, next state.State) s
 func (s *Syncer) deploy(deployer deploy.Deployer, next state.State) state.StateFunc {
 	return func(ctx context.Context) (state.States, error) {
 		glog.V(4).Info("creating new deployer state")
-
+		glog.V(1).Infof("deployment informer started")
+		go s.deploymentInformer.Run(s.stopper)
 		return state.Single(deployer.AsState(next))
 	}
 }
@@ -381,25 +380,35 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	}
 }
 
-func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}){
+func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 
 	//oldDeploy, ok := oldObj.(*appsv1.Deployment)
 	//if !ok {
 	//	glog.Errorf("Not a deploy object")
 	//	return
 	//}
-
+	oldDeploy, ok := oldObj.(*appsv1.Deployment)
+	if !ok {
+		glog.Errorf("Not a deploy object")
+		return
+	}
 	newDeploy, ok := newObj.(*appsv1.Deployment)
 	if !ok {
 		glog.Errorf("Not a deploy object")
 		return
 	}
-
-	glog.Info("----------------   start tracking:    -----------------")
-
-	glog.V(1).Infof("kcd: %v", s.kcd)
-	glog.V(1).Infof("deploy: %v", oldObj)
-
-	glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
-		newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
+	
+	kcdApp, ok := s.kcd.Spec.Selector["kcdapp"]
+	if !ok {
+		glog.Errorf("Could not find kcdapp label in kcd object %v", s.kcd.Name)
+	}
+	label, ok := oldDeploy.Labels["kcdapp"]
+	if !ok {
+		glog.Infof("could not find kcdapp label in deployment %v", oldDeploy.Name)
+		return
+	}
+	if label == kcdApp {
+		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
+			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
+	}
 }
