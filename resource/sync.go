@@ -40,7 +40,7 @@ type Syncer struct {
 
 	options *config.Options
 
-	stopper chan struct{}
+	stopper *chan struct{}
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -81,7 +81,8 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		UpdateFunc: s.trackDeployment,
 	})
 
-	s.stopper = make(chan struct{})
+	stopper := make(chan struct{})
+	s.stopper = &stopper
 
 	return s, nil
 }
@@ -93,7 +94,7 @@ func (s *Syncer) Start() {
 
 // Stop shuts down the sync operation.
 func (s *Syncer) Stop() error {
-	defer close(s.stopper)
+	defer close(*s.stopper)
 	return s.machine.Stop()
 }
 
@@ -143,7 +144,7 @@ func (s *Syncer) initialState() state.StateFunc {
 		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
 
 		glog.V(1).Infof("deployment informer started")
-		go s.deploymentInformer.Run(s.stopper)
+		go s.deploymentInformer.Run(*s.stopper)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
@@ -348,9 +349,9 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.stopper <- struct{}{}
+		*s.stopper <- struct{}{}
 		glog.V(1).Info("deployment informer stopped")
-		
+
 		if !s.kcd.Spec.History.Enabled {
 			glog.V(4).Infof("Not adding version history for kcd=%s, version=%s", s.kcd.Name, version)
 			return state.Single(next)
