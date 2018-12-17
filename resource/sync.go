@@ -397,14 +397,13 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		glog.Errorf("Not a deploy object")
 		return
 	}
-	
+
 	kcdApp, ok := s.kcd.Spec.Selector["kcdapp"]
 	if !ok {
-		glog.Errorf("Could not find kcdapp label in kcd object %v", s.kcd.Name)
+		return
 	}
 	label, ok := oldDeploy.Labels["kcdapp"]
 	if !ok {
-		glog.Infof("could not find kcdapp label in deployment %v", oldDeploy.Name)
 		return
 	}
 	if label == kcdApp {
