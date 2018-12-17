@@ -28,7 +28,6 @@ import (
 type Syncer struct {
 	machine *state.Machine
 	deploymentInformer cache.SharedIndexInformer
-	informerStopped bool
 
 	kcd *kcd1.KCD
 
@@ -41,6 +40,7 @@ type Syncer struct {
 
 	options *config.Options
 
+	stopper *chan struct{}
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -69,7 +69,6 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		resourceProvider: resourceProvider,
 		workloadProvider: workloadProvider,
 		deploymentInformer: deployInformer,
-		informerStopped: true,
 		kcd:              kcd,
 		registryProvider: registryProvider,
 		registry:         registry,
@@ -83,8 +82,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 	})
 
 	stopper := make(chan struct{})
-	go s.deploymentInformer.Run(stopper)
-	glog.V(1).Info("deployment informer initialized")
+	s.stopper = &stopper
 
 	return s, nil
 }
@@ -96,6 +94,7 @@ func (s *Syncer) Start() {
 
 // Stop shuts down the sync operation.
 func (s *Syncer) Stop() error {
+	defer close(*s.stopper)
 	return s.machine.Stop()
 }
 
@@ -145,7 +144,7 @@ func (s *Syncer) initialState() state.StateFunc {
 		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
 
 		glog.V(1).Infof("deployment informer started")
-		s.informerStopped = false
+		go s.deploymentInformer.Run(*s.stopper)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
@@ -350,7 +349,7 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.informerStopped = true
+		*s.stopper <- struct{}{}
 		glog.V(1).Info("deployment informer stopped")
 
 		if !s.kcd.Spec.History.Enabled {
@@ -391,9 +390,6 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}){
 	//	glog.Errorf("Not a deploy object")
 	//	return
 	//}
-	if s.informerStopped {
-		return
-	}
 
 	newDeploy, ok := newObj.(*appsv1.Deployment)
 	if !ok {
