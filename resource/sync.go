@@ -21,7 +21,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	appsv1 "k8s.io/api/apps/v1"
-
+	"encoding/json"
+	"net/http"
+	"bytes"
 )
 
 // Syncer is responsible for handling the main sync loop.
@@ -29,6 +31,7 @@ type Syncer struct {
 	machine *state.Machine
 	deploymentInformer cache.SharedIndexInformer
 	informerStopped bool
+	deployStatusEndpointAPI string
 
 	kcd *kcd1.KCD
 
@@ -45,7 +48,7 @@ type Syncer struct {
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
 func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, registryProvider registry.Provider,
-	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, options ...func(*config.Options)) (*Syncer, error) {
+	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, endpoint string, options ...func(*config.Options)) (*Syncer, error) {
 
 	opts := config.NewOptions()
 	for _, opt := range options {
@@ -69,6 +72,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		resourceProvider: resourceProvider,
 		workloadProvider: workloadProvider,
 		deploymentInformer: deployInformer,
+		deployStatusEndpointAPI: endpoint,
 		kcd:              kcd,
 		registryProvider: registryProvider,
 		registry:         registry,
@@ -406,7 +410,32 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		return
 	}
 	if label == kcdApp && !s.informerStopped{
+		jsonData, err := json.Marshal(oldDeploy)
+		if err != nil {
+			glog.Errorf("Failed marshalling the deployment object: %v", err)
+			return
+		}
+		if s.deployStatusEndpointAPI != "" {
+			sendDeploymentEvent(s.deployStatusEndpointAPI, jsonData)
+		}
 		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
 			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
 	}
+}
+
+func sendDeploymentEvent(endpoint string, jsonData []byte) {
+	timeout := time.Duration(5 * time.Second)
+	client := http.Client{
+		Timeout: timeout,
+	}
+	resp, err := client.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		glog.Errorf("failed to send deployment event to %s: %v", endpoint, err)
+		return
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	glog.V(4).Infof("response: %v", result)
+
 }
