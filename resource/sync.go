@@ -410,7 +410,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		return
 	}
 	if label == kcdApp && !s.informerStopped{
-		jsonData, err := json.Marshal(oldDeploy)
+		jsonData, err := json.Marshal(newDeploy)
 		if err != nil {
 			glog.Errorf("Failed marshalling the deployment object: %v", err)
 			return

@@ -140,6 +140,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 		} else {
 			cfg, err = rest.InClusterConfig()
 		}
+		glog.V(1).Infof("cluster: %v", cfg.Host)
 		if err != nil {
 			scStatus = 2
 			glog.Errorf("Failed to get k8s config: %v", err)
