@@ -73,6 +73,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		resourceProvider: resourceProvider,
 		workloadProvider: workloadProvider,
 		deploymentInformer: deployInformer,
+		informerStopped: true,
 		deployStatusEndpointAPI: endpoint,
 		clusterName: clusterName,
 		kcd:              kcd,
