@@ -32,6 +32,7 @@ type Syncer struct {
 	deploymentInformer cache.SharedIndexInformer
 	informerStopped bool
 	deployStatusEndpointAPI string
+	clusterName string
 
 	kcd *kcd1.KCD
 
@@ -48,7 +49,7 @@ type Syncer struct {
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
 func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, registryProvider registry.Provider,
-	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, endpoint string, options ...func(*config.Options)) (*Syncer, error) {
+	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, endpoint string, clusterName string, options ...func(*config.Options)) (*Syncer, error) {
 
 	opts := config.NewOptions()
 	for _, opt := range options {
@@ -73,6 +74,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		workloadProvider: workloadProvider,
 		deploymentInformer: deployInformer,
 		deployStatusEndpointAPI: endpoint,
+		clusterName: clusterName,
 		kcd:              kcd,
 		registryProvider: registryProvider,
 		registry:         registry,
@@ -410,20 +412,30 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		return
 	}
 	if label == kcdApp && !s.informerStopped{
-		jsonData, err := json.Marshal(newDeploy)
-		if err != nil {
-			glog.Errorf("Failed marshalling the deployment object: %v", err)
-			return
-		}
 		if s.deployStatusEndpointAPI != "" {
-			sendDeploymentEvent(s.deployStatusEndpointAPI, jsonData)
+			statusData := struct{
+				Cluster string
+				Timestamp time.Time
+				Deploy appsv1.Deployment
+			}{
+				s.clusterName,
+				time.Now().UTC(),
+				*newDeploy}
+			sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
 		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
 			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
 	}
 }
 
-func sendDeploymentEvent(endpoint string, jsonData []byte) {
+func sendDeploymentEvent(endpoint string, data interface{}) {
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		glog.Errorf("Failed marshalling the deployment object: %v", err)
+		return
+	}
+
 	timeout := time.Duration(5 * time.Second)
 	client := http.Client{
 		Timeout: timeout,

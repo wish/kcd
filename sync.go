@@ -95,6 +95,7 @@ type crSyncParams struct {
 	kcdName   string
 	version   string
 	endpoint string
+	clusterName string
 }
 
 func newKCDSyncCommand(root *regRoot) *cobra.Command {
@@ -110,6 +111,8 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 	cmd.Flags().StringVar(&params.kcdName, "kcd", "", "name of container version resource that the syncer is based on")
 	cmd.Flags().StringVar(&params.version, "version", "", "Indicates version of kcd resources to use in CR Syncer")
 	cmd.Flags().StringVar(&params.endpoint, "endpoint", "", "the url endpoint to send deployment progress to")
+	cmd.Flags().StringVar(&params.clusterName, "cluster-name", "local", "the cluster name this syncer is running in")
+
 
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if params.kcdName == "" || params.namespace == "" {
@@ -199,7 +202,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		historyProvider := history.NewProvider(k8sClient, stats)
 
-		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, deployInformer, params.endpoint,
+		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, deployInformer, params.endpoint, params.clusterName,
 			conf.WithRecorder(recorder), conf.WithStats(stats))
 		if err != nil {
 			glog.Errorf("Failed to create syncer in namespace=%s for kcd name=%s, error=%v",

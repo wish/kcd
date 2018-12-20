@@ -42,6 +42,7 @@ import (
 // a rolling deployment whenever the container version needs to be updated as per tags of the DR repository.
 type CVController struct {
 	cluster string
+	deployStatusEndpoint string
 	config  *configKey
 
 	kcdImgRepo string
@@ -425,6 +426,8 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								"registry",
 								"sync",
 								fmt.Sprintf("--namespace=%s", kcd.Namespace),
+								fmt.Sprintf("--cluster-name=%s", c.cluster),
+								fmt.Sprintf("--endpoint=%s", c.deployStatusEndpoint),
 								fmt.Sprintf("--kcd=%s", kcd.Name),
 								fmt.Sprintf("--version=%s", specVersion(kcd)),
 								fmt.Sprintf("--logtostderr=true"),
@@ -472,6 +475,14 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 			},
 		},
 	}
+}
+
+func (c *CVController) SetClusterName(clusterName string) {
+	c.cluster = clusterName
+}
+
+func (c *CVController) SetEndPoint(endpoint string) {
+	c.deployStatusEndpoint = endpoint
 }
 
 // propagate glog flags
