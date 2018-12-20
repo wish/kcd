@@ -430,15 +430,24 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 }
 
 func (s *Syncer) stopInformer() {
+
 	s.informerStopped = true;
+
+	kcdApp, ok := s.kcd.Spec.Selector["kcdapp"]
+	if !ok {
+		return
+	}
+
 	statusData := struct{
 		Cluster string
 		Timestamp time.Time
 		Finished bool
+		kcdApp string
 	}{
 		s.clusterName,
 		time.Now().UTC(),
 		true,
+		kcdApp,
 	}
 	if s.deployStatusEndpointAPI != "" {
 		retries := 0
