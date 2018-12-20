@@ -352,7 +352,7 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.informerStopped = true
+		s.stopInformer()
 		glog.V(1).Info("deployment informer stopped")
 
 		if !s.kcd.Spec.History.Enabled {
@@ -422,19 +422,41 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 				s.clusterName,
 				time.Now().UTC(),
 				*newDeploy}
-			sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+			_ := sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
 		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
 			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
 	}
 }
 
-func sendDeploymentEvent(endpoint string, data interface{}) {
+func (s *Syncer) stopInformer() {
+	s.informerStopped = true;
+	statusData := struct{
+		Cluster string
+		Timestamp time.Time
+		Finished bool
+	}{
+		s.clusterName,
+		time.Now().UTC(),
+		true,
+	}
+	if s.deployStatusEndpointAPI != "" {
+		retries := 0
+		err := sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+		for err != nil && retries <= 3  {
+			err = sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+			retries++
+			time.Sleep(1 * time.Second)
+		}
+	}
+}
+
+func sendDeploymentEvent(endpoint string, data interface{}) error {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		glog.Errorf("Failed marshalling the deployment object: %v", err)
-		return
+		return err
 	}
 
 	timeout := time.Duration(5 * time.Second)
@@ -444,11 +466,14 @@ func sendDeploymentEvent(endpoint string, data interface{}) {
 	resp, err := client.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		glog.Errorf("failed to send deployment event to %s: %v", endpoint, err)
-		return
+		return err
 	}
 
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	glog.V(4).Infof("response: %v", result)
-
+	if resp.StatusCode >= 400 {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		glog.V(4).Infof("response: %v", result)
+		return errors.Errorf("%v", resp)
+	}
+	return nil
 }
