@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"bytes"
+	"encoding/json"
+	"net/http"
+
 	"github.com/golang/glog"
 	"github.com/nearmap/kcd/config"
 	"github.com/nearmap/kcd/deploy"
@@ -16,23 +20,21 @@ import (
 	"github.com/nearmap/kcd/state"
 	"github.com/nearmap/kcd/verify"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-	appsv1 "k8s.io/api/apps/v1"
-	"encoding/json"
-	"net/http"
-	"bytes"
 )
 
 // Syncer is responsible for handling the main sync loop.
 type Syncer struct {
-	machine *state.Machine
-	deploymentInformer cache.SharedIndexInformer
-	informerStopped bool
+	machine                 *state.Machine
+	deploymentInformer      cache.SharedIndexInformer
+	informerStopped         bool
 	deployStatusEndpointAPI string
-	clusterName string
+	clusterName             string
+	deployName              string
 
 	kcd *kcd1.KCD
 
@@ -44,7 +46,6 @@ type Syncer struct {
 	registryProvider registry.Provider // used to obtain version information for other registry resoures
 
 	options *config.Options
-
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -70,17 +71,17 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 	}
 
 	s := &Syncer{
-		resourceProvider: resourceProvider,
-		workloadProvider: workloadProvider,
-		deploymentInformer: deployInformer,
-		informerStopped: true,
+		resourceProvider:        resourceProvider,
+		workloadProvider:        workloadProvider,
+		deploymentInformer:      deployInformer,
+		informerStopped:         true,
 		deployStatusEndpointAPI: endpoint,
-		clusterName: clusterName,
-		kcd:              kcd,
-		registryProvider: registryProvider,
-		registry:         registry,
-		historyProvider:  hp,
-		options:          opts,
+		clusterName:             clusterName,
+		kcd:                     kcd,
+		registryProvider:        registryProvider,
+		registry:                registry,
+		historyProvider:         hp,
+		options:                 opts,
 	}
 	s.machine = state.NewMachine(s.initialState(), state.WithStartWaitTime(dur), state.WithTimeout(opTimeout))
 
@@ -412,17 +413,19 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	if !ok {
 		return
 	}
-	if label == kcdApp && !s.informerStopped{
+	if label == kcdApp && !s.informerStopped {
+		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
-			statusData := struct{
-				Cluster string
+			statusData := struct {
+				Cluster   string
 				Timestamp time.Time
-				Deploy appsv1.Deployment
+				Deploy    appsv1.Deployment
 			}{
 				s.clusterName,
 				time.Now().UTC(),
-				*newDeploy}
-			_ := sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+				*newDeploy,
+			}
+			sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
 		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
 			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
@@ -431,28 +434,21 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 
 func (s *Syncer) stopInformer() {
 
-	s.informerStopped = true;
+	s.informerStopped = true
 
-	kcdApp, ok := s.kcd.Spec.Selector["kcdapp"]
-	if !ok {
-		return
-	}
-
-	statusData := struct{
-		Cluster string
-		Timestamp time.Time
-		Finished bool
-		kcdApp string
+	statusData := struct {
+		Cluster    string
+		Timestamp  time.Time
+		DeployName string
 	}{
 		s.clusterName,
 		time.Now().UTC(),
-		true,
-		kcdApp,
+		s.deployName,
 	}
 	if s.deployStatusEndpointAPI != "" {
 		retries := 0
 		err := sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
-		for err != nil && retries <= 3  {
+		for err != nil && retries <= 3 {
 			err = sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 			retries++
 			time.Sleep(1 * time.Second)
