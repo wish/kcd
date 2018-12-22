@@ -447,9 +447,9 @@ func (s *Syncer) stopInformer() {
 	}
 	if s.deployStatusEndpointAPI != "" {
 		retries := 0
-		err := sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+		err := sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
 		for err != nil && retries <= 3 {
-			err = sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+			err = sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
 			retries++
 			time.Sleep(1 * time.Second)
 		}
