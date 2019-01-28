@@ -3,6 +3,9 @@ package resource
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
+	"strconv"
 	"time"
 
 	"bytes"
@@ -46,6 +49,9 @@ type Syncer struct {
 	registryProvider registry.Provider // used to obtain version information for other registry resoures
 
 	options *config.Options
+
+	httpClient *http.Client
+	rand       *rand.Rand
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
@@ -70,6 +76,15 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		return nil, errors.WithStack(err)
 	}
 
+	var client *http.Client = nil
+	var rander *rand.Rand = nil
+	if endpoint != "" {
+		client = &http.Client{
+			Timeout: time.Duration(5 * time.Second),
+		}
+		rander = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+
 	s := &Syncer{
 		resourceProvider:        resourceProvider,
 		workloadProvider:        workloadProvider,
@@ -82,6 +97,8 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		registry:                registry,
 		historyProvider:         hp,
 		options:                 opts,
+		httpClient:              client,
+		rand:                    rander,
 	}
 	s.machine = state.NewMachine(s.initialState(), state.WithStartWaitTime(dur), state.WithTimeout(opTimeout))
 
@@ -388,12 +405,6 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 }
 
 func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
-
-	//oldDeploy, ok := oldObj.(*appsv1.Deployment)
-	//if !ok {
-	//	glog.Errorf("Not a deploy object")
-	//	return
-	//}
 	oldDeploy, ok := oldObj.(*appsv1.Deployment)
 	if !ok {
 		glog.Errorf("Not a deploy object")
@@ -425,7 +436,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 				time.Now().UTC(),
 				*newDeploy,
 			}
-			sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
+			s.sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
 		glog.V(1).Infof("Ready Pods: %d, Available Pods: %d, Updated Pods: %d, Unavailable Pods: %d",
 			newDeploy.Status.ReadyReplicas, newDeploy.Status.AvailableReplicas, newDeploy.Status.UpdatedReplicas, newDeploy.Status.UnavailableReplicas)
@@ -433,7 +444,6 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 }
 
 func (s *Syncer) stopInformer() {
-
 	s.informerStopped = true
 
 	statusData := struct {
@@ -446,39 +456,43 @@ func (s *Syncer) stopInformer() {
 		s.deployName,
 	}
 	if s.deployStatusEndpointAPI != "" {
-		retries := 0
-		err := sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
-		for err != nil && retries <= 3 {
-			err = sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
-			retries++
-			time.Sleep(1 * time.Second)
-		}
+		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
 	}
 }
 
-func sendDeploymentEvent(endpoint string, data interface{}) error {
+func (s *Syncer) sleepFor(attempts int) {
+	if attempts < 1 {
+		return
+	}
+	sleepTime := (s.rand.Float64() + 1) + math.Pow(2, float64(attempts-0))
+	durationStr := fmt.Sprintf("%ss", strconv.FormatFloat(sleepTime, 'f', 2, 64))
+	sleepDuration, _ := time.ParseDuration(durationStr)
+	time.Sleep(sleepDuration)
+}
 
+func (s *Syncer) sendDeploymentEvent(endpoint string, data interface{}) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		glog.Errorf("Failed marshalling the deployment object: %v", err)
-		return err
+		return
 	}
 
-	timeout := time.Duration(5 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-	resp, err := client.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		glog.Errorf("failed to send deployment event to %s: %v", endpoint, err)
-		return err
-	}
+	for retries := 0; retries < 5; retries++ {
+		s.sleepFor(retries)
 
-	if resp.StatusCode >= 400 {
-		var result map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&result)
-		glog.V(4).Infof("response: %v", result)
-		return errors.Errorf("%v", resp)
+		resp, err := s.httpClient.Post(endpoint, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			glog.Errorf("failed to send deployment event to %s: %v", endpoint, err)
+			continue
+		}
+		if resp.StatusCode >= 400 {
+			var result map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&result)
+			glog.V(4).Infof("response: %v", result)
+			resp.Body.Close()
+			continue
+		}
+		resp.Body.Close()
+		break
 	}
-	return nil
 }
