@@ -424,6 +424,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	if !ok {
 		return
 	}
+
 	if label == kcdApp && !s.informerStopped {
 		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
@@ -431,10 +432,12 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 				Cluster   string
 				Timestamp time.Time
 				Deploy    appsv1.Deployment
+				Version   string
 			}{
 				s.clusterName,
 				time.Now().UTC(),
 				*newDeploy,
+				s.kcd.Status.CurrVersion,
 			}
 			s.sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
@@ -450,10 +453,12 @@ func (s *Syncer) stopInformer() {
 		Cluster    string
 		Timestamp  time.Time
 		DeployName string
+		Version    string
 	}{
 		s.clusterName,
 		time.Now().UTC(),
 		s.deployName,
+		s.kcd.Status.CurrVersion,
 	}
 	if s.deployStatusEndpointAPI != "" {
 		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
