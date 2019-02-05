@@ -425,6 +425,12 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		return
 	}
 
+	kcd, err := s.resourceProvider.KCD(s.kcd.Namespace, s.kcd.Name)
+	if err != nil {
+		glog.Errorf("trackDeployment failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
+		return
+	}
+
 	if label == kcdApp && !s.informerStopped {
 		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
@@ -437,7 +443,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 				s.clusterName,
 				time.Now().UTC(),
 				*newDeploy,
-				s.kcd.Status.CurrVersion,
+				kcd.Status.CurrVersion,
 			}
 			s.sendDeploymentEvent(s.deployStatusEndpointAPI, statusData)
 		}
@@ -449,6 +455,12 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 func (s *Syncer) stopInformer() {
 	s.informerStopped = true
 
+	kcd, err := s.resourceProvider.KCD(s.kcd.Namespace, s.kcd.Name)
+	if err != nil {
+		glog.Errorf("stopInformer failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
+		return
+	}
+
 	statusData := struct {
 		Cluster    string
 		Timestamp  time.Time
@@ -458,7 +470,7 @@ func (s *Syncer) stopInformer() {
 		s.clusterName,
 		time.Now().UTC(),
 		s.deployName,
-		s.kcd.Status.CurrVersion,
+		kcd.Status.CurrVersion,
 	}
 	if s.deployStatusEndpointAPI != "" {
 		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
