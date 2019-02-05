@@ -434,6 +434,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	if label == kcdApp && !s.informerStopped {
 		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
+			glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 			statusData := struct {
 				Cluster   string
 				Timestamp time.Time
@@ -460,6 +461,7 @@ func (s *Syncer) stopInformer() {
 		glog.Errorf("stopInformer failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
 		return
 	}
+	glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 
 	statusData := struct {
 		Cluster    string
