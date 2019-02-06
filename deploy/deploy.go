@@ -76,6 +76,12 @@ func PodsForTarget(cs kubernetes.Interface, namespace string, target RolloutTarg
 // within each pod is in a ready state.
 func CheckPods(cs kubernetes.Interface, namespace string, target RolloutTarget, num int32, kcd *kcd1.KCD, version string) (bool, error) {
 	pods, err := PodsForTarget(cs, namespace, target)
+
+	if len(pods) == 0 {
+		glog.V(4).Infof("target %s has 0 pod", target.Name())
+		return true, nil
+	}
+
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get pods for target %s", target.Name())
 	}
