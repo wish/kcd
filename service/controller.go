@@ -396,7 +396,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 
 	// Overwrite endpoint with the value read from configMap
 	cm, err := c.k8sCS.CoreV1().ConfigMaps(kcd.Namespace).Get(kcd.Spec.Container.Name, metav1.GetOptions{})
-	if endpoint, ok := cm.Data["deploy-status-endpoint"]; err == nil && ok {
+	if endpoint, ok := cm.Data["deploy_status_endpoint"]; err == nil && ok {
 		c.deployStatusEndpoint = endpoint
 	}
 
