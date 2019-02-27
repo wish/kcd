@@ -23,10 +23,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/informers"
 )
 
 type regRoot struct {
@@ -91,10 +91,9 @@ func newCRRootCommand() *regRoot {
 type crSyncParams struct {
 	k8sConfig string
 
-	namespace string
-	kcdName   string
-	version   string
-	endpoint string
+	namespace   string
+	kcdName     string
+	version     string
 	clusterName string
 }
 
@@ -110,9 +109,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 	cmd.Flags().StringVar(&params.namespace, "namespace", "", "namespace of container version resource that the syncer is based on.")
 	cmd.Flags().StringVar(&params.kcdName, "kcd", "", "name of container version resource that the syncer is based on")
 	cmd.Flags().StringVar(&params.version, "version", "", "Indicates version of kcd resources to use in CR Syncer")
-	cmd.Flags().StringVar(&params.endpoint, "endpoint", "", "the url endpoint to send deployment progress to")
 	cmd.Flags().StringVar(&params.clusterName, "cluster-name", "local", "the cluster name this syncer is running in")
-
 
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if params.kcdName == "" || params.namespace == "" {
@@ -170,7 +167,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		resourceProvider := resource.NewK8sProvider(params.namespace, customCS, workloadProvider)
 
-		deployInformerFactory := informers.NewFilteredSharedInformerFactory(k8sClient, time.Second * 30, params.namespace, nil)
+		deployInformerFactory := informers.NewFilteredSharedInformerFactory(k8sClient, time.Second*30, params.namespace, nil)
 		deployInformer := deployInformerFactory.Apps().V1().Deployments().Informer()
 
 		kcd, err := customCS.CustomV1().KCDs(params.namespace).Get(params.kcdName, metav1.GetOptions{})
@@ -201,7 +198,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		historyProvider := history.NewProvider(k8sClient, stats)
 
-		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, deployInformer, params.endpoint, params.clusterName,
+		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, deployInformer, params.clusterName,
 			conf.WithRecorder(recorder), conf.WithStats(stats))
 		if err != nil {
 			glog.Errorf("Failed to create syncer in namespace=%s for kcd name=%s, error=%v",

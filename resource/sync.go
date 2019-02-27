@@ -58,7 +58,7 @@ type Syncer struct {
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
 func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, registryProvider registry.Provider,
-	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, endpoint string, clusterName string, options ...func(*config.Options)) (*Syncer, error) {
+	hp history.Provider, kcd *kcd1.KCD, deployInformer cache.SharedIndexInformer, clusterName string, options ...func(*config.Options)) (*Syncer, error) {
 
 	opts := config.NewOptions()
 	for _, opt := range options {
@@ -78,13 +78,26 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		return nil, errors.WithStack(err)
 	}
 
-	var client *http.Client = nil
-	var rander *rand.Rand = nil
-	if endpoint != "" {
-		client = &http.Client{
-			Timeout: time.Duration(5 * time.Second),
+	var httpClient *http.Client
+	var rander *rand.Rand
+	var endpoint string
+
+	if kcd.Spec.Config != nil {
+		client := workloadProvider.Client()
+		namespace := workloadProvider.Namespace()
+
+		cm, err := client.CoreV1().ConfigMaps(namespace).Get(kcd.Spec.Config.Name, metav1.GetOptions{})
+		if err == nil {
+			var ok bool
+			endpoint, ok = cm.Data["deploy-status-endpoint"]
+			if ok {
+				httpClient = &http.Client{
+					Timeout: time.Duration(5 * time.Second),
+				}
+				rander = rand.New(rand.NewSource(time.Now().UnixNano()))
+			}
 		}
-		rander = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	}
 
 	s := &Syncer{
@@ -99,7 +112,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		registry:                registry,
 		historyProvider:         hp,
 		options:                 opts,
-		httpClient:              client,
+		httpClient:              httpClient,
 		rand:                    rander,
 	}
 	s.machine = state.NewMachine(s.initialState(), state.WithStartWaitTime(dur), state.WithTimeout(opTimeout))
