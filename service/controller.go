@@ -393,12 +393,18 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
+	glog.V(1).Infof("creating/updating new KCDSync Deploy of %s", dName)
+	glog.V(1).Infof("before: %s", c.deployStatusEndpoint)
+	glog.V(1).Infof("config map: %s", kcd.Spec.Container.Name)
 
 	// Overwrite endpoint with the value read from configMap
 	cm, err := c.k8sCS.CoreV1().ConfigMaps(kcd.Namespace).Get(kcd.Spec.Container.Name, metav1.GetOptions{})
 	if endpoint, ok := cm.Data["deploy_status_endpoint"]; err == nil && ok {
+		glog.V(1).Infof("overwriting: %s", endpoint)
 		c.deployStatusEndpoint = endpoint
 	}
+
+	glog.V(1).Infof("after: %s", c.deployStatusEndpoint)
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
