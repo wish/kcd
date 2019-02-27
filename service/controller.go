@@ -42,7 +42,6 @@ import (
 // a rolling deployment whenever the container version needs to be updated as per tags of the DR repository.
 type CVController struct {
 	cluster string
-	deployStatusEndpoint string
 	config  *configKey
 
 	kcdImgRepo string
@@ -393,6 +392,16 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
+
+	// Default deploy status endpoint
+	endpoint := "https://kube-deploy.i.wish.com/deploy_status"
+
+	cm, err := c.k8sCS.CoreV1().ConfigMaps(kcd.Namespace).Get(kcd.Spec.Config.Name, metav1.GetOptions{})
+	if endpointStr, ok := cm.Data["deploy-status-endpoint"]; err == nil && ok {
+		// Overwrite it with the value read from configMap
+		endpoint = endpointStr
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dName,
@@ -427,7 +436,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								"sync",
 								fmt.Sprintf("--namespace=%s", kcd.Namespace),
 								fmt.Sprintf("--cluster-name=%s", c.cluster),
-								fmt.Sprintf("--endpoint=%s", c.deployStatusEndpoint),
+								fmt.Sprintf("--endpoint=%s", endpoint),
 								fmt.Sprintf("--kcd=%s", kcd.Name),
 								fmt.Sprintf("--version=%s", specVersion(kcd)),
 								fmt.Sprintf("--logtostderr=true"),
@@ -479,10 +488,6 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 
 func (c *CVController) SetClusterName(clusterName string) {
 	c.cluster = clusterName
-}
-
-func (c *CVController) SetEndPoint(endpoint string) {
-	c.deployStatusEndpoint = endpoint
 }
 
 // propagate glog flags

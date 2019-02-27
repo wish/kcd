@@ -32,9 +32,9 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	k8sinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 func main() {
@@ -105,8 +105,7 @@ func (sp *statsParams) stats(namespace string, tags ...string) (stats.Stats, err
 type runParams struct {
 	k8sConfig    string
 	configMapKey string
-	clusterName string
-	endpoint string
+	clusterName  string
 
 	kcdImgRepo string
 
@@ -130,7 +129,6 @@ func newRunCommand() *cobra.Command {
 	rc.Flags().StringVar(&params.configMapKey, "configmap-key", "kube-system/kcd", "Namespaced key of configmap that container version and region config defined")
 	rc.Flags().StringVar(&params.kcdImgRepo, "kcd-img-repo", "nearmap/kcd", "Name of the docker registry to used be controller. defaults to nearmap/kcd")
 	rc.Flags().StringVar(&params.clusterName, "cluster-name", "local", "the cluster name this kcd is running on")
-	rc.Flags().StringVar(&params.endpoint, "deploy-status-endpoint", "", "the url endpoint that syncers can send the status to")
 	rc.Flags().BoolVar(&params.history, "history", false, "unused")
 	rc.Flags().BoolVar(&params.rollback, "rollback", false, "unused")
 	rc.Flags().IntVar(&params.port, "port", 8081, "Port to run http server on")
@@ -194,7 +192,6 @@ func newRunCommand() *cobra.Command {
 			return errors.Wrap(err, "Failed to create controller")
 		}
 		kcdc.SetClusterName(params.clusterName)
-		kcdc.SetEndPoint(params.endpoint)
 
 		k8sInformerFactory.Start(stopCh)
 		customInformerFactory.Start(stopCh)
