@@ -393,15 +393,18 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
+
+	var endpoint = c.deployStatusEndpoint
+
 	glog.V(1).Infof("creating/updating new KCDSync Deploy of %s", dName)
 	glog.V(1).Infof("before: %s", c.deployStatusEndpoint)
 	glog.V(1).Infof("config map: %s", kcd.Spec.Container.Name)
 
 	// Overwrite endpoint with the value read from configMap
 	cm, err := c.k8sCS.CoreV1().ConfigMaps(kcd.Namespace).Get(kcd.Spec.Container.Name, metav1.GetOptions{})
-	if endpoint, ok := cm.Data["deploy_status_endpoint"]; err == nil && ok {
+	if endpointStr, ok := cm.Data["deploy_status_endpoint"]; err == nil && ok {
 		glog.V(1).Infof("overwriting: %s", endpoint)
-		c.deployStatusEndpoint = endpoint
+		endpoint = endpointStr
 	}
 
 	glog.V(1).Infof("after: %s", c.deployStatusEndpoint)
@@ -440,7 +443,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								"sync",
 								fmt.Sprintf("--namespace=%s", kcd.Namespace),
 								fmt.Sprintf("--cluster-name=%s", c.cluster),
-								fmt.Sprintf("--endpoint=%s", c.deployStatusEndpoint),
+								fmt.Sprintf("--endpoint=%s", endpoint),
 								fmt.Sprintf("--kcd=%s", kcd.Name),
 								fmt.Sprintf("--version=%s", specVersion(kcd)),
 								fmt.Sprintf("--logtostderr=true"),
