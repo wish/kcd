@@ -41,9 +41,9 @@ import (
 // It is then KCDSync service's responsibility to keep the version of a container up to date and perform
 // a rolling deployment whenever the container version needs to be updated as per tags of the DR repository.
 type CVController struct {
-	cluster string
+	cluster              string
 	deployStatusEndpoint string
-	config  *configKey
+	config               *configKey
 
 	kcdImgRepo string
 
@@ -393,6 +393,13 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
+
+	// Overwrite endpoint with the value read from configMap
+	cm, err := c.k8sCS.CoreV1().ConfigMaps(kcd.Namespace).Get(kcd.Spec.Config.Name, metav1.GetOptions{})
+	if endpoint, ok := cm.Data["deploy-status-endpoint"]; err == nil && ok {
+		c.deployStatusEndpoint = endpoint
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dName,
