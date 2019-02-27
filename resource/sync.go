@@ -80,7 +80,9 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 
 	var httpClient *http.Client
 	var rander *rand.Rand
-	var endpoint string
+
+	// Default deploy status endpoint
+	endpoint := "https://kube-deploy.i.wish.com/deploy_status"
 
 	if kcd.Spec.Config != nil {
 		client := workloadProvider.Client()
@@ -89,16 +91,19 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		cm, err := client.CoreV1().ConfigMaps(namespace).Get(kcd.Spec.Config.Name, metav1.GetOptions{})
 		if err == nil {
 			var ok bool
-			endpoint, ok = cm.Data["deploy-status-endpoint"]
+			endpointStr, ok := cm.Data["deploy-status-endpoint"]
 			if ok {
-				httpClient = &http.Client{
-					Timeout: time.Duration(5 * time.Second),
-				}
-				rander = rand.New(rand.NewSource(time.Now().UnixNano()))
+				//Overwrite the endpoint reading from configMap
+				endpoint = endpointStr
 			}
 		}
-
 	}
+
+	// We are always using default endpoint, so create the http client each time.
+	httpClient = &http.Client{
+		Timeout: time.Duration(5 * time.Second),
+	}
+	rander = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	s := &Syncer{
 		resourceProvider:        resourceProvider,
