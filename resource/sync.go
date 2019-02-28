@@ -36,7 +36,6 @@ import (
 type Syncer struct {
 	machine                 *state.Machine
 	deploymentInformer      cache.SharedIndexInformer
-	informerStopped         bool
 	deployStatusEndpointAPI string
 	clusterName             string
 	deployName              string
@@ -91,7 +90,6 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		resourceProvider:        resourceProvider,
 		workloadProvider:        workloadProvider,
 		deploymentInformer:      deployInformer,
-		informerStopped:         true,
 		deployStatusEndpointAPI: endpoint,
 		clusterName:             clusterName,
 		kcd:                     kcd,
@@ -291,7 +289,6 @@ func (s *Syncer) deploy(deployer deploy.Deployer, next state.State) state.StateF
 	return func(ctx context.Context) (state.States, error) {
 		glog.V(4).Info("creating new deployer state")
 		glog.V(1).Infof("deployment informer started")
-		s.informerStopped = false
 		return state.Single(deployer.AsState(next))
 	}
 }
@@ -441,7 +438,7 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 		return
 	}
 
-	if label == kcdApp && !s.informerStopped {
+	if label == kcdApp {
 		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
 			glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
@@ -464,7 +461,6 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 }
 
 func (s *Syncer) stopInformer() {
-	s.informerStopped = true
 
 	kcd, err := s.resourceProvider.KCD(s.kcd.Namespace, s.kcd.Name)
 	if err != nil {
