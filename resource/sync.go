@@ -244,6 +244,8 @@ func (s *Syncer) handleFailure(version string, deployer deploy.Deployer) state.O
 			glog.V(1).Infof("Not rolling back kcd=%v", s.kcd.Name)
 		}
 
+		s.sendDeployedFinishedEvent(false)
+
 		return state.NewStates(next)
 	}
 }
@@ -377,8 +379,7 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.stopInformer()
-		glog.V(1).Info("deployment informer stopped")
+		s.sendDeployedFinishedEvent(true)
 
 		if !s.kcd.Spec.History.Enabled {
 			glog.V(4).Infof("Not adding version history for kcd=%s, version=%s", s.kcd.Name, version)
@@ -460,13 +461,17 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	}
 }
 
-func (s *Syncer) stopInformer() {
-
+// sendDeployedFinishedEvent sends an http request to the specified deployStatusEndpointAPI
+// indicating that the rollout has completed.
+//
+// TODO: just use the already emitted failure event instead
+func (s *Syncer) sendDeployedFinishedEvent(success bool) {
 	kcd, err := s.resourceProvider.KCD(s.kcd.Namespace, s.kcd.Name)
 	if err != nil {
-		glog.Errorf("stopInformer failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
+		glog.Errorf("sendDeployedFinishedEvent failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
 		return
 	}
+	glog.V(1).Infof("sendDeployedFinishedEvent: %t ", success)
 	glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 
 	statusData := struct {
@@ -474,11 +479,13 @@ func (s *Syncer) stopInformer() {
 		Timestamp  time.Time
 		DeployName string
 		Version    string
+		Success    bool
 	}{
 		s.clusterName,
 		time.Now().UTC(),
 		s.deployName,
 		kcd.Status.CurrVersion,
+		success,
 	}
 	if s.deployStatusEndpointAPI != "" {
 		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
