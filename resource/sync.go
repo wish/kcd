@@ -39,6 +39,7 @@ type Syncer struct {
 	deployStatusEndpointAPI string
 	clusterName             string
 	deployName              string
+	deployEnvs              map[string]bool
 
 	kcd *kcd1.KCD
 
@@ -91,6 +92,7 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 		workloadProvider:        workloadProvider,
 		deploymentInformer:      deployInformer,
 		deployStatusEndpointAPI: endpoint,
+		deployEnvs:              make(map[string]bool),
 		clusterName:             clusterName,
 		kcd:                     kcd,
 		registryProvider:        registryProvider,
@@ -440,7 +442,16 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	}
 
 	if label == kcdApp {
-		s.deployName = oldDeploy.Name
+
+		//update the deployName, using the kcdapp label.
+		s.deployName = label
+
+		//if deployment has env label, add env name into the envs.
+		envLabel, ok := oldDeploy.Labels["kcdenv"]
+		if ok {
+			s.deployEnvs[envLabel] = true
+		}
+
 		if s.deployStatusEndpointAPI != "" {
 			glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 			statusData := struct {
@@ -480,16 +491,30 @@ func (s *Syncer) sendDeployedFinishedEvent(success bool) {
 		DeployName string
 		Version    string
 		Success    bool
+		EnvName    string
 	}{
-		s.clusterName,
-		time.Now().UTC(),
-		s.deployName,
-		kcd.Status.CurrVersion,
-		success,
+		Cluster:    s.clusterName,
+		Timestamp:  time.Now().UTC(),
+		DeployName: s.deployName,
+		Version:    kcd.Status.CurrVersion,
+		Success:    success,
 	}
+
 	if s.deployStatusEndpointAPI != "" {
-		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
+
+		if len(s.deployEnvs) == 0 {
+			// in case the deployment does not setup with env label
+			s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
+		} else {
+			// In the case of 1 syncer handling multiple deployments with different kcdenv labels.
+			// we loop through the envs, and send finished message to each of them.
+			for e := range s.deployEnvs {
+				statusData.EnvName = e
+				s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
+			}
+		}
 	}
+
 }
 
 func (s *Syncer) sleepFor(attempts int) {
