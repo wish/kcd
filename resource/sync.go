@@ -38,7 +38,6 @@ type Syncer struct {
 	deploymentInformer      cache.SharedIndexInformer
 	deployStatusEndpointAPI string
 	clusterName             string
-	deployName              string
 
 	kcd *kcd1.KCD
 
@@ -244,7 +243,7 @@ func (s *Syncer) handleFailure(version string, deployer deploy.Deployer) state.O
 			glog.V(1).Infof("Not rolling back kcd=%v", s.kcd.Name)
 		}
 
-		s.sendDeployedFinishedEvent(false)
+		s.sendDeployedFinishedEvent(deployer, false)
 
 		return state.NewStates(next)
 	}
@@ -379,7 +378,7 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	return func(ctx context.Context) (state.States, error) {
 
 		// stopped the deployment informer here
-		s.sendDeployedFinishedEvent(true)
+		s.sendDeployedFinishedEvent(deployer, true)
 
 		if !s.kcd.Spec.History.Enabled {
 			glog.V(4).Infof("Not adding version history for kcd=%s, version=%s", s.kcd.Name, version)
@@ -440,7 +439,6 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 	}
 
 	if label == kcdApp {
-		s.deployName = oldDeploy.Name
 		if s.deployStatusEndpointAPI != "" {
 			glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 			statusData := struct {
@@ -465,7 +463,8 @@ func (s *Syncer) trackDeployment(oldObj interface{}, newObj interface{}) {
 // indicating that the rollout has completed.
 //
 // TODO: just use the already emitted failure event instead
-func (s *Syncer) sendDeployedFinishedEvent(success bool) {
+func (s *Syncer) sendDeployedFinishedEvent(deployer deploy.Deployer, success bool) {
+
 	kcd, err := s.resourceProvider.KCD(s.kcd.Namespace, s.kcd.Name)
 	if err != nil {
 		glog.Errorf("sendDeployedFinishedEvent failed to obtain KCD resource with name %s: %v", s.kcd.Name, err)
@@ -474,21 +473,37 @@ func (s *Syncer) sendDeployedFinishedEvent(success bool) {
 	glog.V(1).Infof("sendDeployedFinishedEvent: %t ", success)
 	glog.V(1).Infof("current version is: %s", kcd.Status.CurrVersion)
 
-	statusData := struct {
-		Cluster    string
-		Timestamp  time.Time
-		DeployName string
-		Version    string
-		Success    bool
-	}{
-		s.clusterName,
-		time.Now().UTC(),
-		s.deployName,
-		kcd.Status.CurrVersion,
-		success,
-	}
-	if s.deployStatusEndpointAPI != "" {
-		s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
+	// create a deployments Client from the workload given a namespace
+	deploymentsClient := s.workloadProvider.Client().AppsV1().Deployments(s.kcd.Namespace)
+
+	// for each RolloutTarget, we send the finished log
+	for _, t := range deployer.Workloads() {
+
+		// get the deployment based off on the deployment name
+		deployment, err := deploymentsClient.Get(t.Name(), metav1.GetOptions{})
+		if err != nil {
+			glog.Errorf("sendDeployedFinishedEvent failed to obtain deployment resource with name %s: %v", t.Name(), err)
+			return
+		}
+
+		// if endpoint is configured we send out the data.
+		if s.deployStatusEndpointAPI != "" {
+			statusData := struct {
+				Cluster   string
+				Timestamp time.Time
+				Deploy    appsv1.Deployment
+				Version   string
+				Success   bool
+			}{
+				s.clusterName,
+				time.Now().UTC(),
+				*deployment,
+				kcd.Status.CurrVersion,
+				success,
+			}
+			s.sendDeploymentEvent(fmt.Sprintf("%s/finished", s.deployStatusEndpointAPI), statusData)
+		}
+
 	}
 }
 
