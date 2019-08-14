@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	v1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -101,9 +101,9 @@ var (
 )
 
 // PatchPodSpec implements the Workload interface.
-func (cj *CronJob) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
+func (cj *CronJob) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, imageRepo, version string) error {
 	_, err := cj.client.Patch(cj.cronJob.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(cronJobPatchPodJSON, container.Name, kcd.Spec.ImageRepo, version)))
+		[]byte(fmt.Sprintf(cronJobPatchPodJSON, container.Name, imageRepo, version)))
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for CronJOb %s", cj.cronJob.Name)
 	}

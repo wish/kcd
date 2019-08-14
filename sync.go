@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	conf "github.com/wish/kcd/config"
 	"github.com/wish/kcd/events"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
@@ -20,8 +22,6 @@ import (
 	"github.com/wish/kcd/signals"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/stats"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -93,6 +93,7 @@ type crSyncParams struct {
 	namespace string
 	kcdName   string
 	version   string
+	imageRepo string
 }
 
 func newKCDSyncCommand(root *regRoot) *cobra.Command {
@@ -107,6 +108,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 	cmd.Flags().StringVar(&params.namespace, "namespace", "", "namespace of container version resource that the syncer is based on.")
 	cmd.Flags().StringVar(&params.kcdName, "kcd", "", "name of container version resource that the syncer is based on")
 	cmd.Flags().StringVar(&params.version, "version", "", "Indicates version of kcd resources to use in CR Syncer")
+	cmd.Flags().StringVar(&params.imageRepo, "imageRepo", "", "Indicates imageRepo to use when patching resources")
 
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if params.kcdName == "" || params.namespace == "" {
@@ -192,7 +194,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		historyProvider := history.NewProvider(k8sClient, stats)
 
-		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd,
+		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, params.imageRepo,
 			conf.WithRecorder(recorder), conf.WithStats(stats))
 		if err != nil {
 			glog.Errorf("Failed to create syncer in namespace=%s for kcd name=%s, error=%v",

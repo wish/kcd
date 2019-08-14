@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -88,9 +88,9 @@ func (rs *ReplicaSet) PodTemplateSpec() corev1.PodTemplateSpec {
 }
 
 // PatchPodSpec implements the Workload interface.
-func (rs *ReplicaSet) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
+func (rs *ReplicaSet) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, imageRepo, version string) error {
 	_, err := rs.client.Patch(rs.replicaSet.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
+		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, imageRepo, version)))
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for ReplicaSet %s", rs.replicaSet.Name)
 	}

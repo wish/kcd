@@ -74,7 +74,7 @@ func TestBlueGreenDeployErrorCases(t *testing.T) {
 	var registryProvider registry.Provider
 
 	// SUT
-	deployer, err := deploy.NewBlueGreenDeployer(workloadProvider, registryProvider, kcd, version)
+	deployer, err := deploy.NewBlueGreenDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("unexpected error for new bluegreen deployer")
 	}

@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	conf "github.com/wish/kcd/config"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
 	scheme "github.com/wish/kcd/gok8s/client/clientset/versioned/scheme"
 	informers "github.com/wish/kcd/gok8s/client/informers/externalversions"
 	customlister "github.com/wish/kcd/gok8s/client/listers/custom/v1"
-	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +45,7 @@ type CVController struct {
 	config  *configKey
 
 	kcdImgRepo string
+	imageRepo  string
 
 	k8sCS    kubernetes.Interface
 	customCS clientset.Interface
@@ -73,7 +74,7 @@ type configKey struct {
 // and thus performing the roll-out if required (using the roll-out strategy specified in deployment.
 func NewCVController(configMapKey, kcdImgRepo string,
 	k8sCS kubernetes.Interface, customCS clientset.Interface,
-	k8sIF k8sinformers.SharedInformerFactory, customIF informers.SharedInformerFactory,
+	k8sIF k8sinformers.SharedInformerFactory, customIF informers.SharedInformerFactory, imageRepo string,
 	options ...func(*conf.Options)) (*CVController, error) {
 
 	opts := conf.NewOptions()
@@ -103,6 +104,7 @@ func NewCVController(configMapKey, kcdImgRepo string,
 		},
 
 		kcdImgRepo: kcdImgRepo,
+		imageRepo:  imageRepo,
 
 		k8sCS:    k8sCS,
 		customCS: customCS,
@@ -358,7 +360,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 	_, err := c.deployLister.Deployments(namespace).Get(syncDeployName(kcd.Name))
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(c.newKCDSyncDeployment(kcd, version))
+			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(c.newKCDSyncDeployment(kcd, c.imageRepo, version))
 			if err != nil {
 				c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedCreateKCDSync", "Failed to create DR Sync deployment")
 				return errors.Wrapf(err, "Failed to create DR Sync deployment %s", key)
@@ -368,7 +370,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 		return errors.Wrapf(err, "Failed to find DR Sync deployment %s", key)
 	}
 
-	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(c.newKCDSyncDeployment(kcd, version))
+	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(c.newKCDSyncDeployment(kcd, c.imageRepo, version))
 	if err != nil {
 		c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedUpdateKCDSync", "Failed to update DR Sync deployment")
 		return errors.Wrapf(err, "Failed to update DR Sync deployment %s", key)
@@ -380,7 +382,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 // the appropriate OwnerReferences on the resource so we can discover
 // the KCD resource that 'owns' it.
 // TODO We need to improve on auto-upgrading DRsync deployments ..
-func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *appsv1.Deployment {
+func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, imageRepo, version string) *appsv1.Deployment {
 	nr := int32(1)
 	dName := syncDeployName(kcd.Name)
 	livenessSeconds := kcd.Spec.LivenessSeconds
@@ -430,6 +432,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								fmt.Sprintf("--logtostderr=true"),
 								fmt.Sprintf("--v=%d", glogVerbosity),
 								fmt.Sprintf("--vmodule=%s", glogVmodule),
+								fmt.Sprintf("--imageRepo=%s", imageRepo),
 							},
 							Env: []corev1.EnvVar{
 								{

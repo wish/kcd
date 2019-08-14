@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,6 +47,7 @@ type BlueGreenDeployer struct {
 	kcd       *kcd1.KCD
 	blueGreen *kcd1.BlueGreenSpec
 	version   string
+	imageRepo string
 
 	// primary is the current live workload (before the rollout) and secondary is the
 	// workload that will be updated and made live.
@@ -56,7 +57,7 @@ type BlueGreenDeployer struct {
 
 // NewBlueGreenDeployer returns a Deployer for performing blue-green rollouts.
 func NewBlueGreenDeployer(workloadProvider workload.Provider, registryProvider registry.Provider, kcd *kcd1.KCD,
-	version string) (*BlueGreenDeployer, error) {
+	imageRepo, version string) (*BlueGreenDeployer, error) {
 
 	glog.V(2).Infof("Creating BlueGreenDeployer: namespace=%s, kcd=%s, version=%s",
 		workloadProvider.Namespace(), kcd.Name, version)
@@ -98,6 +99,7 @@ func NewBlueGreenDeployer(workloadProvider workload.Provider, registryProvider r
 		kcd:              kcd,
 		blueGreen:        kcd.Spec.Strategy.BlueGreen,
 		version:          version,
+		imageRepo:        imageRepo,
 	}
 
 	service, err := bgd.getService(kcd.Spec.Strategy.BlueGreen.ServiceName)
@@ -179,7 +181,7 @@ func (bgd *BlueGreenDeployer) updateVersion(target TemplateRolloutTarget, next s
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			for _, c := range podSpec.Containers {
 				if c.Name == bgd.kcd.Spec.Container.Name {
-					if updateErr := target.PatchPodSpec(bgd.kcd, c, bgd.version); updateErr != nil {
+					if updateErr := target.PatchPodSpec(bgd.kcd, c, bgd.imageRepo, bgd.version); updateErr != nil {
 						glog.V(2).Infof("Failed to update container version (will retry): version=%v, target=%v, error=%v",
 							bgd.version, target.Name(), updateErr)
 						return updateErr

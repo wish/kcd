@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	kcdv1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcdv1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -25,7 +25,7 @@ type Workload interface {
 
 	// PatchPodSpec receives a pod spec and container which is to be patched
 	// according to an appropriate strategy for the type.
-	PatchPodSpec(kcd *kcdv1.KCD, container corev1.Container, version string) error
+	PatchPodSpec(kcd *kcdv1.KCD, container corev1.Container, imageRepo, version string) error
 
 	// RollbackAfter indicates duration after which a failed rollout
 	// should attempt rollback

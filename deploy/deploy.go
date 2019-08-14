@@ -2,12 +2,12 @@ package deploy
 
 import (
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	k8s "github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -39,16 +39,19 @@ type SupportsRollback interface {
 }
 
 // New returns a Deployer instance based on the "kind" of the kcd resource.
-func New(workloadProvider workload.Provider, registryProvider registry.Provider, kcd *kcd1.KCD, version string) (Deployer, error) {
+func New(workloadProvider workload.Provider, registryProvider registry.Provider, kcd *kcd1.KCD, imageRepo, version string) (Deployer, error) {
 	if glog.V(2) {
 		glog.V(2).Infof("Creating deployment for kcd=%+v, version=%s", kcd, version)
+	}
+	if imageRepo == "" {
+		imageRepo = kcd.Spec.ImageRepo
 	}
 
 	switch kcd.Spec.Strategy.Kind {
 	case KindServieBlueGreen:
-		return NewBlueGreenDeployer(workloadProvider, registryProvider, kcd, version)
+		return NewBlueGreenDeployer(workloadProvider, registryProvider, kcd, imageRepo, version)
 	default:
-		return NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+		return NewSimpleDeployer(workloadProvider, registryProvider, kcd, imageRepo, version)
 	}
 }
 

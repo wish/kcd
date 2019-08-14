@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/wish/kcd/deploy"
 	"github.com/wish/kcd/deploy/fake"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apimacherrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,7 +38,7 @@ func TestSimpleDeploy(t *testing.T) {
 	// TODO:
 	var registryProvider registry.Provider
 
-	_, err := deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	_, err := deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err == nil {
 		t.Errorf("Expected error when no workloads provided")
 	}
@@ -51,7 +51,7 @@ func TestSimpleDeploy(t *testing.T) {
 	targets = []deploy.RolloutTarget{target}
 	workloadProvider = workload.NewFakeProvider(cs, "test-namespace", targets)
 
-	sd, err := deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	sd, err := deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("Unexpected error creating NewSimpleDeployer")
 	}
@@ -74,7 +74,7 @@ func TestSimpleDeploy(t *testing.T) {
 	targets = []deploy.RolloutTarget{target}
 	workloadProvider = workload.NewFakeProvider(cs, "test-namespace", targets)
 
-	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("Unexpected error creating NewSimpleDeployer")
 	}
@@ -112,7 +112,7 @@ func TestSimpleDeploy(t *testing.T) {
 	targets = []deploy.RolloutTarget{target}
 	workloadProvider = workload.NewFakeProvider(cs, "test-namespace", targets)
 
-	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("Unexpected error creating NewSimpleDeployer")
 	}
@@ -136,7 +136,7 @@ func TestSimpleDeploy(t *testing.T) {
 	pps.Error = errors.New("an error occurred")
 	target.Invocations <- pps
 
-	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("Unexpected error creating NewSimpleDeployer")
 	}
@@ -152,7 +152,7 @@ func TestSimpleDeploy(t *testing.T) {
 	target.Invocations <- pps
 	target.Invocations <- fake.NewInvocationPatchPodSpec()
 
-	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, version)
+	sd, err = deploy.NewSimpleDeployer(workloadProvider, registryProvider, kcd, kcd.Spec.ImageRepo, version)
 	if err != nil {
 		t.Errorf("Unexpected error creating NewSimpleDeployer")
 	}

@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 )
@@ -23,16 +23,17 @@ type SimpleDeployer struct {
 
 	registryProvider registry.Provider
 
-	kcd     *kcd1.KCD
-	version string
-	targets []RolloutTarget
+	kcd       *kcd1.KCD
+	version   string
+	imageRepo string
+	targets   []RolloutTarget
 }
 
 // NewSimpleDeployer returns a new SimpleDeployer instance, which triggers rollouts
 // by patching the target's pod spec with a new version and using the default
 // Kubernetes deployment strategy for the workload.
 func NewSimpleDeployer(workloadProvider workload.Provider, registryProvider registry.Provider,
-	kcd *kcd1.KCD, version string) (*SimpleDeployer, error) {
+	kcd *kcd1.KCD, imageRepo, version string) (*SimpleDeployer, error) {
 
 	if glog.V(2) {
 		glog.V(2).Infof("Creating SimpleDeployer: kcd=%s, version=%s", kcd.Name, version)
@@ -52,6 +53,7 @@ func NewSimpleDeployer(workloadProvider workload.Provider, registryProvider regi
 		registryProvider: registryProvider,
 		kcd:              kcd,
 		version:          version,
+		imageRepo:        imageRepo,
 		targets:          workloads,
 	}, nil
 }
@@ -88,7 +90,7 @@ func (sd *SimpleDeployer) patchPodSpec(target RolloutTarget, version string) err
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		for _, c := range podSpec.Containers {
 			if c.Name == sd.kcd.Spec.Container.Name {
-				if updateErr := target.PatchPodSpec(sd.kcd, c, version); updateErr != nil {
+				if updateErr := target.PatchPodSpec(sd.kcd, c, sd.imageRepo, version); updateErr != nil {
 					glog.V(2).Infof("Failed to update container version: version=%v, target=%v, error=%v",
 						version, target.Name(), updateErr)
 					return updateErr

@@ -91,7 +91,7 @@ func NewInvocationPatchPodSpec() *InvocationPatchPodSpec {
 }
 
 // PatchPodSpec implements the RolloutTarget interface.
-func (rt *RolloutTarget) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
+func (rt *RolloutTarget) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, imageRepo, version string) error {
 	var pps InvocationPatchPodSpec
 	rt.invocationFor(&pps)
 
