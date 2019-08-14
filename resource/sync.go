@@ -35,14 +35,14 @@ type Syncer struct {
 	registry         registry.Registry // provides version information for the current kcd resource
 	registryProvider registry.Provider // used to obtain version information for other registry resoures
 
-	imageRepo string
+	imageRepoOverwrite map[string]string
 
 	options *config.Options
 }
 
 // NewSyncer creates a Syncer instance for handling the main sync loop.
 func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, registryProvider registry.Provider,
-	hp history.Provider, kcd *kcd1.KCD, imageRepo string, options ...func(*config.Options)) (*Syncer, error) {
+	hp history.Provider, kcd *kcd1.KCD, imageRepoOverwrite map[string]string, options ...func(*config.Options)) (*Syncer, error) {
 
 	opts := config.NewOptions()
 	for _, opt := range options {
@@ -63,14 +63,14 @@ func NewSyncer(resourceProvider Provider, workloadProvider workload.Provider, re
 	}
 
 	s := &Syncer{
-		resourceProvider: resourceProvider,
-		workloadProvider: workloadProvider,
-		kcd:              kcd,
-		registryProvider: registryProvider,
-		registry:         registry,
-		historyProvider:  hp,
-		options:          opts,
-		imageRepo:        imageRepo,
+		resourceProvider:   resourceProvider,
+		workloadProvider:   workloadProvider,
+		kcd:                kcd,
+		registryProvider:   registryProvider,
+		registry:           registry,
+		historyProvider:    hp,
+		options:            opts,
+		imageRepoOverwrite: imageRepoOverwrite,
 	}
 	s.machine = state.NewMachine(s.initialState(), state.WithStartWaitTime(dur), state.WithTimeout(opTimeout))
 	return s, nil
@@ -114,7 +114,7 @@ func (s *Syncer) initialState() state.StateFunc {
 			glog.V(4).Infof("Got registry versions for kcd=%s, tag=%s, versions=%v, rolloutVersion=%s", s.kcd.Name, kcd.Spec.Tag, strings.Join(versions, ", "), version)
 		}
 
-		deployer, err := deploy.New(s.workloadProvider, s.registryProvider, s.kcd, s.imageRepo, versions[0])
+		deployer, err := deploy.New(s.workloadProvider, s.registryProvider, s.kcd, s.imageRepoOverwrite, versions[0])
 		if err != nil {
 			glog.Errorf("Failed to create deployer for kcd=%s: %v", s.kcd.Name, err)
 			return state.Error(errors.Wrap(err, "failed to create deployer"))

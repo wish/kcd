@@ -90,10 +90,10 @@ func newCRRootCommand() *regRoot {
 type crSyncParams struct {
 	k8sConfig string
 
-	namespace string
-	kcdName   string
-	version   string
-	imageRepo string
+	namespace          string
+	kcdName            string
+	version            string
+	imageRepoOverwrite map[string]string
 }
 
 func newKCDSyncCommand(root *regRoot) *cobra.Command {
@@ -108,7 +108,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 	cmd.Flags().StringVar(&params.namespace, "namespace", "", "namespace of container version resource that the syncer is based on.")
 	cmd.Flags().StringVar(&params.kcdName, "kcd", "", "name of container version resource that the syncer is based on")
 	cmd.Flags().StringVar(&params.version, "version", "", "Indicates version of kcd resources to use in CR Syncer")
-	cmd.Flags().StringVar(&params.imageRepo, "imageRepo", "", "Indicates imageRepo to use when patching resources")
+	cmd.Flags().StringToStringVarP(&params.imageRepoOverwrite, "image-repo-overwrite", "", map[string]string{}, "Sets imagerepo overwrite when updating resources")
 
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if params.kcdName == "" || params.namespace == "" {
@@ -194,7 +194,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		historyProvider := history.NewProvider(k8sClient, stats)
 
-		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, params.imageRepo,
+		crSyncer, err := resource.NewSyncer(resourceProvider, workloadProvider, registryProvider, historyProvider, kcd, params.imageRepoOverwrite,
 			conf.WithRecorder(recorder), conf.WithStats(stats))
 		if err != nil {
 			glog.Errorf("Failed to create syncer in namespace=%s for kcd name=%s, error=%v",

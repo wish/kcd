@@ -105,8 +105,8 @@ type runParams struct {
 	k8sConfig    string
 	configMapKey string
 
-	kcdImgRepo string
-	imageRepo  string
+	kcdImgRepo         string
+	imageRepoOverwrite string
 
 	port int
 
@@ -130,7 +130,7 @@ func newRunCommand() *cobra.Command {
 	rc.Flags().BoolVar(&params.history, "history", false, "unused")
 	rc.Flags().BoolVar(&params.rollback, "rollback", false, "unused")
 	rc.Flags().IntVar(&params.port, "port", 8081, "Port to run http server on")
-	rc.Flags().StringVar(&params.imageRepo, "imageRepo", "", "Sets imagerepo overwrite when updating resources")
+	rc.Flags().StringVarP(&params.imageRepoOverwrite, "image-repo-overwrite", "=", "", "Sets imagerepo overwrite when updating resources")
 	(&params.stats).addFlags(rc)
 
 	rc.RunE = func(cmd *cobra.Command, args []string) (err error) {
@@ -185,7 +185,7 @@ func newRunCommand() *cobra.Command {
 		// Controllers here
 		kcdc, err := svc.NewCVController(params.configMapKey, params.kcdImgRepo,
 			k8sClient, customClient,
-			k8sInformerFactory, customInformerFactory, params.imageRepo,
+			k8sInformerFactory, customInformerFactory, params.imageRepoOverwrite,
 			conf.WithStats(stats))
 		if err != nil {
 			return errors.Wrap(err, "Failed to create controller")

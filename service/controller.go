@@ -44,8 +44,8 @@ type CVController struct {
 	cluster string
 	config  *configKey
 
-	kcdImgRepo string
-	imageRepo  string
+	kcdImgRepo         string
+	imageRepoOverwrite string
 
 	k8sCS    kubernetes.Interface
 	customCS clientset.Interface
@@ -74,7 +74,7 @@ type configKey struct {
 // and thus performing the roll-out if required (using the roll-out strategy specified in deployment.
 func NewCVController(configMapKey, kcdImgRepo string,
 	k8sCS kubernetes.Interface, customCS clientset.Interface,
-	k8sIF k8sinformers.SharedInformerFactory, customIF informers.SharedInformerFactory, imageRepo string,
+	k8sIF k8sinformers.SharedInformerFactory, customIF informers.SharedInformerFactory, imageRepoOverwrite string,
 	options ...func(*conf.Options)) (*CVController, error) {
 
 	opts := conf.NewOptions()
@@ -103,8 +103,8 @@ func NewCVController(configMapKey, kcdImgRepo string,
 			ns:   namespace,
 		},
 
-		kcdImgRepo: kcdImgRepo,
-		imageRepo:  imageRepo,
+		kcdImgRepo:         kcdImgRepo,
+		imageRepoOverwrite: imageRepoOverwrite,
 
 		k8sCS:    k8sCS,
 		customCS: customCS,
@@ -360,7 +360,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 	_, err := c.deployLister.Deployments(namespace).Get(syncDeployName(kcd.Name))
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(c.newKCDSyncDeployment(kcd, c.imageRepo, version))
+			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(c.newKCDSyncDeployment(kcd, c.imageRepoOverwrite, version))
 			if err != nil {
 				c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedCreateKCDSync", "Failed to create DR Sync deployment")
 				return errors.Wrapf(err, "Failed to create DR Sync deployment %s", key)
@@ -370,7 +370,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 		return errors.Wrapf(err, "Failed to find DR Sync deployment %s", key)
 	}
 
-	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(c.newKCDSyncDeployment(kcd, c.imageRepo, version))
+	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(c.newKCDSyncDeployment(kcd, c.imageRepoOverwrite, version))
 	if err != nil {
 		c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedUpdateKCDSync", "Failed to update DR Sync deployment")
 		return errors.Wrapf(err, "Failed to update DR Sync deployment %s", key)
@@ -382,7 +382,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 // the appropriate OwnerReferences on the resource so we can discover
 // the KCD resource that 'owns' it.
 // TODO We need to improve on auto-upgrading DRsync deployments ..
-func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, imageRepo, version string) *appsv1.Deployment {
+func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, imageRepoOverwrite string, version string) *appsv1.Deployment {
 	nr := int32(1)
 	dName := syncDeployName(kcd.Name)
 	livenessSeconds := kcd.Spec.LivenessSeconds
@@ -432,7 +432,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, imageRepo, version st
 								fmt.Sprintf("--logtostderr=true"),
 								fmt.Sprintf("--v=%d", glogVerbosity),
 								fmt.Sprintf("--vmodule=%s", glogVmodule),
-								fmt.Sprintf("--imageRepo=%s", imageRepo),
+								fmt.Sprintf("--image-repo-overwrite=%v", imageRepoOverwrite),
 							},
 							Env: []corev1.EnvVar{
 								{

@@ -1,6 +1,9 @@
 package deploy
 
 import (
+	"fmt"
+	"regexp"
+
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
@@ -39,12 +42,15 @@ type SupportsRollback interface {
 }
 
 // New returns a Deployer instance based on the "kind" of the kcd resource.
-func New(workloadProvider workload.Provider, registryProvider registry.Provider, kcd *kcd1.KCD, imageRepo, version string) (Deployer, error) {
+func New(workloadProvider workload.Provider, registryProvider registry.Provider, kcd *kcd1.KCD, imageRepoOverwrite map[string]string, version string) (Deployer, error) {
 	if glog.V(2) {
 		glog.V(2).Infof("Creating deployment for kcd=%+v, version=%s", kcd, version)
 	}
-	if imageRepo == "" {
-		imageRepo = kcd.Spec.ImageRepo
+	imageRepo := kcd.Spec.ImageRepo
+	r := regexp.MustCompile(`(?P<Repo>[^\/]+)(?P<Image>\/.*)`)
+	split := r.FindStringSubmatch(kcd.Spec.ImageRepo)
+	if repo, ok := imageRepoOverwrite[split[1]]; ok && repo != "" {
+		imageRepo = fmt.Sprintf("%s%s", imageRepoOverwrite[split[1]], split[2])
 	}
 
 	switch kcd.Spec.Strategy.Kind {
