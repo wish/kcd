@@ -1,7 +1,7 @@
 package workload
 
 import (
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
@@ -80,17 +80,19 @@ func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, versions ...str
 	for _, c := range podSpec.Containers {
 		if c.Name == kcd.Spec.Container.Name {
 			match = true
-			parts := strings.SplitN(c.Image, ":", 2)
-			if len(parts) > 2 {
+			r := regexp.MustCompile(`(.*)\:(.*)`)
+			parts := r.FindStringSubmatch(c.Image)
+			if len(parts) != 3 {
 				return false, errors.Errorf("invalid image found in container %s: %v", c.Name, c.Image)
 			}
-			if parts[0] != kcd.Spec.ImageRepo {
-				return false, errors.Errorf("Repository mismatch for container %s: %s and requested %s don't match",
-					c.Name, parts[0], kcd.Spec.ImageRepo)
-			}
-
+			/*
+				if parts[0] != kcd.Spec.ImageRepo {
+					return false, errors.Errorf("Repository mismatch for container %s: %s and requested %s don't match",
+						c.Name, parts[0], kcd.Spec.ImageRepo)
+				}
+			*/
 			found := false
-			cver := parts[1]
+			cver := parts[2]
 			for _, version := range versions {
 				if cver == version {
 					found = true
