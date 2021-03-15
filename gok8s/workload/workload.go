@@ -98,16 +98,15 @@ func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, taggedVersion s
 			configVersion := parts[1]
 			if !versionRegex.MatchString(configVersion) {
 				glog.V(4).Infof("Current image tag from manifest not SHA: %v, %v", configVersion, c.Name)
-				return false, nil
+				return true, nil
 			}
 
 			glog.V(4).Infof("Current image tag from manifest: %v, %v", configVersion, c.Name)
 			if configVersion != taggedVersion {
 				glog.V(4).Infof("Current image tag from manifest not equal " +
 					" to tagged version from ECR: %v, %v", configVersion, taggedVersion)
-				return true, nil
+				return false, nil
 			}
-			return false, nil
 		}
 	}
 
