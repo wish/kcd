@@ -145,7 +145,7 @@ func (s *Syncer) initialState() state.StateFunc {
 // shouldProcess returns whether a rollout should be performed on the workloads defined
 // by the KCD resource.
 func (s *Syncer) shouldProcess(deployer deploy.Deployer, kcd *kcd1.KCD, versions []string) (bool, error) {
-	var containsCurrentVersion bool
+	containsCurrentVersion := false
 	for _, version := range versions {
 		if version == kcd.Status.CurrVersion {
 			containsCurrentVersion = true
