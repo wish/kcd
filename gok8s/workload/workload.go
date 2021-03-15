@@ -75,7 +75,7 @@ type TemplateWorkload interface {
 // names that match the kcd spec have the given version.
 // Returns false if at least one container's version does not match at least one
 // specified version.
-// Return false if checking it is not a image SHA
+// Return false if it is not a image SHA
 // Returns an error if no containers in the pod spec match the container name
 // defined by the KCD resource.
 func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, taggedVersion string) (bool, error) {
