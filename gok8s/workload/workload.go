@@ -78,7 +78,7 @@ type TemplateWorkload interface {
 // Return false if it is not a image SHA
 // Returns an error if no containers in the pod spec match the container name
 // defined by the KCD resource.
-func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, taggedVersion string) (bool, error) {
+func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, versions ...string) (bool, error) {
 	match := false
 	glog.V(4).Infof("podSpec: %v kcd: %v", podSpec, kcd)
 	versionRegex, _ := regexp.Compile(`[0-9a-f]{5,40}`)
@@ -94,18 +94,37 @@ func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, taggedVersion s
 				return false, errors.Errorf("Repository mismatch for container %s: %s and requested %s don't match",
 					c.Name, parts[0], kcd.Spec.ImageRepo)
 			}
+			// Test for checking if tag not SHA (manifest always SHA, means something manual apply), doing nothing on deployment
+			if kcd.Namespace == "hello-service" {
+				configVersion := parts[1]
+				if !versionRegex.MatchString(configVersion) {
+					glog.V(4).Infof("Current image tag from manifest not SHA: %v, %v", configVersion, c.Name)
+					return true, nil
+				}
 
-			configVersion := parts[1]
-			if !versionRegex.MatchString(configVersion) {
-				glog.V(4).Infof("Current image tag from manifest not SHA: %v, %v", configVersion, c.Name)
-				return true, nil
-			}
+				glog.V(4).Infof("Current image tag from manifest: %v, %v", configVersion, c.Name)
 
-			glog.V(4).Infof("Current image tag from manifest: %v, %v", configVersion, c.Name)
-			if configVersion != taggedVersion {
-				glog.V(4).Infof("Current image tag from manifest not equal " +
-					" to tagged version from ECR: %v, %v", configVersion, taggedVersion)
-				return false, nil
+				for _, version := range versions {
+					if configVersion != version {
+						glog.V(4).Infof("Current image tag from manifest not equal " +
+							" to tagged version from ECR: %v, %v", configVersion, version)
+						return false, nil
+					}
+				}
+			} else {
+				found := false
+				cver := parts[1]
+				glog.V(4).Infof("Current image tag from manifest: %v, %v", cver, c.Name)
+				for _, version := range versions {
+					if cver == version {
+						found = true
+						break
+					}
+				}
+				if !found {
+					glog.V(4).Info("Version not found")
+					return false, nil
+				}
 			}
 		}
 	}
