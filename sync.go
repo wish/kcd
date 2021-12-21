@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	conf "github.com/wish/kcd/config"
 	"github.com/wish/kcd/events"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
@@ -15,13 +17,12 @@ import (
 	"github.com/wish/kcd/registry"
 	dh "github.com/wish/kcd/registry/dockerhub"
 	"github.com/wish/kcd/registry/ecr"
+	"github.com/wish/kcd/registry/harbor"
 	"github.com/wish/kcd/resource"
 	svc "github.com/wish/kcd/service"
 	"github.com/wish/kcd/signals"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/stats"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -183,6 +184,8 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 			registryProvider, err = ecr.NewECR(kcd.Spec.ImageRepo, kcd.Spec.VersionSyntax, stats)
 		case "dockerhub":
 			registryProvider, err = dh.NewDHV2(kcd.Spec.ImageRepo, kcd.Spec.VersionSyntax, dh.WithStats(stats))
+		case "harbor":
+			registryProvider, err = harbor.NewHarbor(kcd.Spec.ImageRepo, kcd.Spec.VersionSyntax)
 		}
 		if err != nil {
 			glog.Errorf("Failed to create registry provider in namespace=%s for kcd name=%s, error=%v",
@@ -277,6 +280,8 @@ func newTagsCommand(root *regRoot) *cobra.Command {
 			crProvider, err = ecr.NewECR(root.params.registry, params.verPat, root.stats)
 		case "dockerhub":
 			crProvider, err = dh.NewDHV2(root.params.registry, params.verPat, dh.WithStats(root.stats))
+		case "harbor":
+			crProvider, err = harbor.NewHarbor(root.params.registry, params.verPat)
 		}
 		if err != nil {
 			return err

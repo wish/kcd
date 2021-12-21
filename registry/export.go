@@ -9,6 +9,8 @@ import (
 func ProviderByRepo(repoARN string) string {
 	if strings.Contains(repoARN, "amazonaws.com") {
 		return "ecr"
+	} else if strings.Contains(repoARN, "harbor") {
+		return "harbor"
 	}
 	return "dockerhub"
 }

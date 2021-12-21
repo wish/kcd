@@ -1,9 +1,10 @@
 package workload
 
 import (
-	"github.com/golang/glog"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
 
 	"github.com/pkg/errors"
 	kcdv1 "github.com/wish/kcd/gok8s/apis/custom/v1"
@@ -83,7 +84,7 @@ func CheckPodSpecVersion(podSpec corev1.PodSpec, kcd *kcdv1.KCD, versions ...str
 		glog.V(4).Infof("Container: %v kcd Container Name: %v", c.Name, kcd.Spec.Container.Name)
 		if c.Name == kcd.Spec.Container.Name {
 			match = true
-			parts := strings.SplitN(c.Image, ":", 2)
+			parts := strings.SplitN(c.Image, "@", 2)
 			if len(parts) > 2 {
 				return false, errors.Errorf("invalid image found in container %s: %v", c.Name, c.Image)
 			}
