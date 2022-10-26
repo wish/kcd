@@ -99,7 +99,7 @@ func (s *Syncer) initialState() state.StateFunc {
 		// refresh kcd resource state
 		s.kcd = kcd
 
-		versions, err := s.registry.Versions(ctx, s.kcd.Spec.Tag)
+		versions, digest, err := s.registry.Versions(ctx, s.kcd.Spec.Tag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry, kcd=%s, tag=%s: %v", s.kcd.Name, kcd.Spec.Tag, err)
 			s.options.Recorder.Event(events.Warning, "KCDSyncFailed", "Failed to get versions from registry")
@@ -108,7 +108,7 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		version := versions[0]
 		if glog.V(4) {
-			glog.V(4).Infof("Got registry versions for kcd=%s, tag=%s, versions=%v, rolloutVersion=%s", s.kcd.Name, kcd.Spec.Tag, strings.Join(versions, ", "), version)
+			glog.V(4).Infof("Got registry versions for kcd=%s, tag=%s, versions=%v, rolloutVersion=%s, imageDigest=%s", s.kcd.Name, kcd.Spec.Tag, strings.Join(versions, ", "), version, *digest)
 		}
 
 		deployer, err := deploy.New(s.workloadProvider, s.registryProvider, s.kcd, versions[0])
