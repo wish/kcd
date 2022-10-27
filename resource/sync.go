@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/wish/kcd/config"
 	"github.com/wish/kcd/deploy"
 	"github.com/wish/kcd/events"
@@ -15,8 +17,6 @@ import (
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/golang/glog"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,7 +98,8 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		// refresh kcd resource state
 		s.kcd = kcd
-
+		
+		// get digest from ECR Describe Image in order to have more strict image version validation with Robbie 
 		versions, digest, err := s.registry.Versions(ctx, s.kcd.Spec.Tag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry, kcd=%s, tag=%s: %v", s.kcd.Name, kcd.Spec.Tag, err)
@@ -127,8 +128,22 @@ func (s *Syncer) initialState() state.StateFunc {
 			glog.V(4).Infof("Not attempting %s rollout of version %s: %+v", s.kcd.Name, version, s.kcd.Status)
 			return state.None()
 		}
-
-		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
+		
+		process, err = s.acquireSignOffFromRobbieRetryable(&robbieSignOffRequest{
+			kcdName:      s.kcd.GetName(),
+			kcdNameSpace: s.kcd.GetNamespace(),
+			kcdLables:    s.kcd.GetLabels(),
+			kcdTag:       s.kcd.Spec.Tag,
+			kcdImageRepo: s.kcd.Spec.ImageRepo,
+			versions: versions,
+			digest: digest,
+		})
+		
+		if err != nil || !process {
+			glog.V(4).Infof("Fail to acquire sign-off by Robbie, so not attempting %s rollout of version %s: %+v", s.kcd.Name, version, s.kcd.Status)
+			return state.None()
+		}
+		glog.V(4).Infof("Successfully acquire sign-off by Robbie and creating rollout state for kcd=%s", s.kcd.Name)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
@@ -370,4 +385,33 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 
 		return state.Single(next)
 	}
+}
+
+type robbieSignOffRequest struct {
+	kcdName string
+	kcdNameSpace string
+	kcdLables map[string]string
+	kcdTag string 
+	kcdImageRepo string
+	versions registry.Versions
+	digest registry.Digest
+}
+
+func (s *Syncer) acquireSignOffFromRobbieRetryable(signoffReq *robbieSignOffRequest) (bool, error) {
+	// max attempts to Robbie Sign off is set as 3, and init sleep duration is 3 seconds 
+	attempts := 3
+	sleep := 3
+	result := false
+	var err error
+	for i := 0; i < attempts; i++ {
+		result, err = signOffPost(signoffReq)
+		if err == nil {
+			return result, nil
+		} else {
+			time.Sleep(time.Duration(sleep) * time.Second)
+			sleep *= 2
+		}
+	}
+	return result, err
+
 }
