@@ -11,10 +11,10 @@ type signOffReview struct {
 	uuid string `json:"uuid"`
 }
 
-func signOffPost(signoffReq *robbieSignOffRequest) (bool, error) {
+func signOffPost(signoffReq *robbieSignOffRequest) (*signOffReview, error) {
 	requestBody, err := json.Marshal(&signoffReq)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	authAuthenticatorUrl := ""
 	r, err := http.NewRequest("POST", authAuthenticatorUrl, bytes.NewBuffer(requestBody))
@@ -23,7 +23,7 @@ func signOffPost(signoffReq *robbieSignOffRequest) (bool, error) {
 	client := &http.Client{}
 	res, err := client.Do(r)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	defer res.Body.Close()
@@ -31,8 +31,8 @@ func signOffPost(signoffReq *robbieSignOffRequest) (bool, error) {
 	review := &signOffReview{}
 	derr := json.NewDecoder(res.Body).Decode(review)
 	if derr != nil {
-		return false, derr
+		return nil, derr
 	}
-	return review.result, nil
+	return review, nil
 
 }

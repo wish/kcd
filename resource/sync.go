@@ -401,17 +401,20 @@ func (s *Syncer) acquireSignOffFromRobbieRetryable(signoffReq *robbieSignOffRequ
 	// max attempts to Robbie Sign off is set as 3, and init sleep duration is 3 seconds 
 	attempts := 3
 	sleep := 3
-	result := false
+	var result *signOffReview
 	var err error
 	for i := 0; i < attempts; i++ {
+		glog.V(2).Infof("Querying with Robbie to get sign-off review for the %v attempt", i)
 		result, err = signOffPost(signoffReq)
 		if err == nil {
-			return result, nil
+			glog.V(2).Infof("Successfully get with Robbie sign-off review as %v, with UUId as %v", result.result, result.uuid)
+			return result.result, nil
 		} else {
+			glog.V(2).Infof("Querying with Robbie to get sign-off review fails, sleep for %v second to retry", sleep)
 			time.Sleep(time.Duration(sleep) * time.Second)
 			sleep *= 2
 		}
 	}
-	return result, err
+	return false, err
 
 }
