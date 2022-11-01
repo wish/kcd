@@ -128,17 +128,17 @@ func (s *Syncer) initialState() state.StateFunc {
 			glog.V(4).Infof("Not attempting %s rollout of version %s: %+v", s.kcd.Name, version, s.kcd.Status)
 			return state.None()
 		}
-		
-		process, err = s.acquireSignOffFromRobbieRetryable(&robbieSignOffRequest{
-			kcdName:      s.kcd.GetName(),
-			kcdNameSpace: s.kcd.GetNamespace(),
-			kcdLables:    s.kcd.GetLabels(),
-			kcdTag:       s.kcd.Spec.Tag,
-			kcdImageRepo: s.kcd.Spec.ImageRepo,
-			versions: versions,
-			digest: digest,
-		})
-		
+
+		process, err = signOffRetryalbe(&robbieSignOffRequest{
+			KcdName:      s.kcd.GetName(),
+			KcdNameSpace: s.kcd.GetNamespace(),
+			KcdLables:    s.kcd.GetLabels(),
+			KcdTag:       s.kcd.Spec.Tag,
+			KcdImageRepo: s.kcd.Spec.ImageRepo,
+			Versions:     versions,
+			Digest:       digest,
+		}, RobbieEndpoint)
+
 		if err != nil || !process {
 			glog.V(4).Infof("Fail to acquire sign-off by Robbie, so not attempting %s rollout of version %s: %+v", s.kcd.Name, version, s.kcd.Status)
 			return state.None()
@@ -387,34 +387,3 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 	}
 }
 
-type robbieSignOffRequest struct {
-	kcdName string
-	kcdNameSpace string
-	kcdLables map[string]string
-	kcdTag string 
-	kcdImageRepo string
-	versions registry.Versions
-	digest registry.Digest
-}
-
-func (s *Syncer) acquireSignOffFromRobbieRetryable(signoffReq *robbieSignOffRequest) (bool, error) {
-	// max attempts to Robbie Sign off is set as 3, and init sleep duration is 3 seconds 
-	attempts := 3
-	sleep := 3
-	var result *signOffReview
-	var err error
-	for i := 0; i < attempts; i++ {
-		glog.V(2).Infof("Querying with Robbie to get sign-off review for the %v attempt", i)
-		result, err = signOffPost(signoffReq)
-		if err == nil {
-			glog.V(2).Infof("Successfully get with Robbie sign-off review as %v, with UUId as %v", result.result, result.uuid)
-			return result.result, nil
-		} else {
-			glog.V(2).Infof("Querying with Robbie to get sign-off review fails, sleep for %v second to retry", sleep)
-			time.Sleep(time.Duration(sleep) * time.Second)
-			sleep *= 2
-		}
-	}
-	return false, err
-
-}

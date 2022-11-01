@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wish/kcd/registry"
+	"github.com/wish/kcd/stats"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"github.com/wish/kcd/registry"
-	"github.com/wish/kcd/stats"
 )
 
 var ecrRule, _ = regexp.Compile("([0-9]*).dkr.ecr.([a-z0-9-]*).amazonaws.com/([a-zA-Z0-9/\\_-]*)")
