@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	conf "github.com/wish/kcd/config"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
 	scheme "github.com/wish/kcd/gok8s/client/clientset/versioned/scheme"
 	informers "github.com/wish/kcd/gok8s/client/informers/externalversions"
 	customlister "github.com/wish/kcd/gok8s/client/listers/custom/v1"
-	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -392,6 +392,11 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
+	// default value: kops.k8s.io/instancegroup, to ensure there is no breaking effect to legacy env
+	// for new stage env, it should be node.wish.com/instancegroup from environment variable NODE_SELECTOR 
+	nodeSelector := getEnv("NODE_SELECTOR", "kops.k8s.io/instancegroup")
+	glog.V(1).Info("Getting node selector label=%s", nodeSelector)
+	
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dName,
@@ -448,6 +453,10 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 										},
 									},
 								},
+								{
+									Name: "NODE_SELECTOR",
+									Value: nodeSelector,
+								},
 							},
 							LivenessProbe: &corev1.Probe{
 								PeriodSeconds:       int32(livenessSeconds),
@@ -469,7 +478,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 						},
 					},
 					NodeSelector: map[string]string{
-						"kops.k8s.io/instancegroup": "kcd",
+						nodeSelector: "kcd",
 					},
 				},
 			},
@@ -519,4 +528,12 @@ func specVersion(kcd *kcd1.KCD) string {
 	}
 	result := md5.Sum(byt)
 	return fmt.Sprintf("%x", result)
+}
+
+// customized get environment variable function with fallback default value 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
