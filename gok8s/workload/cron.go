@@ -1,17 +1,19 @@
 package workload
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
-	v1beta1 "k8s.io/api/batch/v1beta1"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	goappsv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	goappsv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
 const (
@@ -20,18 +22,18 @@ const (
 
 // CronJob defines a workload for managing CronJobs.
 type CronJob struct {
-	cronJob *v1beta1.CronJob
+	cronJob *batchv1.CronJob
 
-	client goappsv1beta1.CronJobInterface
+	client goappsv1.CronJobInterface
 }
 
 // NewCronJob returns an instance for managing CronJob workloads.
-func NewCronJob(cs kubernetes.Interface, namespace string, cronJob *v1beta1.CronJob) *CronJob {
-	client := cs.BatchV1beta1().CronJobs(namespace)
+func NewCronJob(cs kubernetes.Interface, namespace string, cronJob *batchv1.CronJob) *CronJob {
+	client := cs.BatchV1().CronJobs(namespace)
 	return newCronJob(cronJob, client)
 }
 
-func newCronJob(cronJob *v1beta1.CronJob, client goappsv1beta1.CronJobInterface) *CronJob {
+func newCronJob(cronJob *batchv1.CronJob, client goappsv1.CronJobInterface) *CronJob {
 	return &CronJob{
 		cronJob: cronJob,
 		client:  client,
@@ -102,8 +104,8 @@ var (
 
 // PatchPodSpec implements the Workload interface.
 func (cj *CronJob) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
-	_, err := cj.client.Patch(cj.cronJob.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(cronJobPatchPodJSON, container.Name, kcd.Spec.ImageRepo, version)))
+	_, err := cj.client.Patch(context.TODO(), cj.cronJob.ObjectMeta.Name, types.StrategicMergePatchType,
+		[]byte(fmt.Sprintf(cronJobPatchPodJSON, container.Name, kcd.Spec.ImageRepo, version)), v1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for CronJOb %s", cj.cronJob.Name)
 	}

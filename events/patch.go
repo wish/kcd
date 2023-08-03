@@ -3,18 +3,18 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/golang/glog"
 	"github.com/mitchellh/mapstructure"
 	"github.com/wish/kcd/gok8s/client/clientset/versioned"
 	"github.com/wish/kcd/registry/ecr"
 	"github.com/wish/kcd/stats"
-	"k8s.io/api/admission/v1beta1"
+	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"regexp"
-	"strconv"
-	"strings"
 )
-
 
 const (
 	EnabledLabel = "kcd-version-patcher.wish.com/enabled"
@@ -22,7 +22,6 @@ const (
 	KcdAppName = "kcdapp"
 
 	ContainerPatchPath = "/spec/template/spec/containers"
-	
 )
 
 // objectWithMeta allows us to unmarshal just the ObjectMeta of a k8s object
@@ -31,7 +30,7 @@ type objectWithMeta struct {
 }
 
 type containaerData struct {
-	Name string `mapstructure:"name"`
+	Name  string `mapstructure:"name"`
 	Image string `mapstructure:"image"`
 }
 
@@ -87,12 +86,12 @@ func (r Record) Get(nameParts []string, cName string) (string, string, bool) {
 }
 
 // Mutate tag applied by flux to version
-func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *versioned.Clientset) *v1beta1.AdmissionResponse {
+func Mutate(req *v1.AdmissionRequest, stats stats.Stats, customClient *versioned.Clientset) *v1.AdmissionResponse {
 	var newManifest objectWithMeta
 
 	if err := json.Unmarshal(req.Object.Raw, &newManifest); err != nil {
 		glog.Errorf("Could not unmarshal raw object: %v", err)
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
@@ -103,7 +102,8 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 	var kcdName string
 	if kcdAppName, ok := newManifest.Labels[KcdAppName]; !ok {
 		glog.Infof("Can not find kcdapp label in manifest under name: %s and namespace: %s", newManifest.Name, newManifest.Namespace)
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
+			UID:     req.UID,
 			Allowed: true,
 			Result: &metav1.Status{
 				Message: "Can not find kcdapp label in manifest",
@@ -113,12 +113,13 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 		kcdName = kcdAppName + "-kcd"
 	}
 	// Retrieve kcd resource
-	kcd, err := customClient.CustomV1().KCDs(newManifest.Namespace).Get(kcdName, metav1.GetOptions{})
+	kcd, err := customClient.CustomV1().KCDs(newManifest.Namespace).Get(context.TODO(), kcdName, metav1.GetOptions{})
 
 	if err != nil {
 		glog.Errorf("Failed to find KCD resource in namespace=%s, name=%s, error=%v", newManifest.Namespace, newManifest.Name, err)
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Allowed: true,
+			UID:     req.UID,
 			Result: &metav1.Status{
 				Message: "Can not retrieve KCD resources",
 			},
@@ -136,23 +137,24 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 		// if enable label is FALSE or not boolean, pass the checking
 		if b, err := strconv.ParseBool(v); err != nil {
 			glog.V(4).Infof("Label kcd-version-patcher.wish.com/enabled is not boolean: %v", v)
-			return &v1beta1.AdmissionResponse{
+			return &v1.AdmissionResponse{
 				Allowed: true,
+				UID:     req.UID,
 				Result: &metav1.Status{
 					Message: "Patching enabled is not boolean value",
 				},
 			}
 		} else if !b {
 			glog.V(4).Infof("Label kcd-version-patcher.wish.com/enabled is not true: %v", v)
-			return &v1beta1.AdmissionResponse{
+			return &v1.AdmissionResponse{
 				Allowed: true,
+				UID:     req.UID,
 				Result: &metav1.Status{
 					Message: "Patching is disabled",
 				},
 			}
 		}
 	}
-
 
 	containerName := kcd.Spec.Container.Name
 	glog.V(4).Infof("KCD resource container name to patch %s", containerName)
@@ -161,7 +163,7 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 
 	if req.OldObject.Raw != nil {
 		if err := json.Unmarshal(req.OldObject.Raw, &currentMap); err != nil {
-			return &v1beta1.AdmissionResponse{
+			return &v1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: err.Error(),
 				},
@@ -171,7 +173,7 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 
 	var newMap map[string]interface{}
 	if err := json.Unmarshal(req.Object.Raw, &newMap); err != nil {
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
@@ -183,8 +185,9 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 	// if we tried to patch the container name specified in path, but not successful.
 	if !ok {
 		glog.Errorf("Patching service container %v is failed", Record(currentMap))
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Allowed: true,
+			UID:     req.UID,
 			Result: &metav1.Status{
 				Message: "Patching is not successful",
 			},
@@ -192,8 +195,9 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 	}
 
 	if len(patches) == 0 {
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Allowed: true,
+			UID:     req.UID,
 			Result: &metav1.Status{
 				Message: "No patching needed",
 			},
@@ -202,7 +206,7 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
-		return &v1beta1.AdmissionResponse{
+		return &v1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: err.Error(),
 			},
@@ -210,11 +214,12 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 	}
 
 	glog.V(4).Infof("AdmissionResponse: patch=%v\n", string(patchBytes))
-	return &v1beta1.AdmissionResponse{
+	return &v1.AdmissionResponse{
 		Allowed: true,
+		UID:     req.UID,
 		Patch:   patchBytes,
-		PatchType: func() *v1beta1.PatchType {
-			pt := v1beta1.PatchTypeJSONPatch
+		PatchType: func() *v1.PatchType {
+			pt := v1.PatchTypeJSONPatch
 			return &pt
 		}(),
 	}
@@ -257,7 +262,7 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 	pathToPatch := strings.Join([]string{ContainerPatchPath, idxFlux, "image"}, "/")
 
 	patchOp := patchOperation{
-		Path:  pathToPatch,
+		Path: pathToPatch,
 	}
 
 	p, e := ecr.NewECR(imageRepoFlux, ecr.VersionRegex, stats)
@@ -272,7 +277,7 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 		versions, err := registry.Versions(context.Background(), fluxTag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry using tag=%s", fluxTag)
-			return nil , false
+			return nil, false
 		}
 		version := versions[0]
 		glog.Infof("Got registry versions for container=%s, tag=%s, rolloutVersion=%s", cName, fluxTag, version)
@@ -284,5 +289,3 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 		return patches, true
 	}
 }
-
-

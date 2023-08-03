@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	conf "github.com/wish/kcd/config"
 	"github.com/wish/kcd/events"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
@@ -20,9 +24,6 @@ import (
 	"github.com/wish/kcd/signals"
 	"github.com/wish/kcd/stats"
 	"github.com/wish/kcd/stats/datadog"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextCS "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -32,9 +33,9 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	k8sinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 func main() {
@@ -115,8 +116,8 @@ type runParams struct {
 
 	stats statsParams
 
-	certFile       string // path to the x509 certificate for https
-	keyFile        string // path to the x509 private key matching `CertFile`
+	certFile string // path to the x509 certificate for https
+	keyFile  string // path to the x509 private key matching `CertFile`
 }
 
 func newRunCommand() *cobra.Command {
@@ -251,17 +252,17 @@ func updateCVCRDSpec(cfg *rest.Config) error {
 
 	crd := obj.(*apiextv1beta1.CustomResourceDefinition)
 
-	crdSrc, err := apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	crdSrc, err := apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			if _, err = apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+			if _, err = apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 				return errors.WithStack(err)
 			}
 		}
 		return errors.WithStack(err)
 	}
 	crd.ObjectMeta = crdSrc.ObjectMeta
-	_, err = apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	_, err = apiExtCS.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.WithStack(err)
 	}

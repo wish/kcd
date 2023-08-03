@@ -1,13 +1,14 @@
 package resource
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcdv1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
 	"github.com/wish/kcd/gok8s/workload"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,7 +59,7 @@ func (p *K8sProvider) KCD(namespace, name string) (*kcdv1.KCD, error) {
 	glog.V(2).Infof("Getting KCD with name=%s", name)
 
 	client := p.kcdcs.CustomV1().KCDs(namespace)
-	kcd, err := client.Get(name, metav1.GetOptions{})
+	kcd, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get KCD instance with name %s", name)
 	}
@@ -71,7 +72,7 @@ func (p *K8sProvider) KCD(namespace, name string) (*kcdv1.KCD, error) {
 
 // AllResources returns all resources managed by container versions in the current namespace.
 func (p *K8sProvider) AllResources(namespace string) ([]*Resource, error) {
-	kcds, err := p.kcdcs.CustomV1().KCDs(namespace).List(metav1.ListOptions{})
+	kcds, err := p.kcdcs.CustomV1().KCDs(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to generate template of CV list")
 	}
@@ -106,27 +107,28 @@ func (p *K8sProvider) UpdateStatus(namespace, kcdName, version, status string, t
 
 	client := p.kcdcs.CustomV1().KCDs(namespace)
 
-	kcd, err := client.Get(kcdName, metav1.GetOptions{})
+	kcd, err := client.Get(context.TODO(), kcdName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get KCD instance with name %s", kcd.Name)
 	}
+	kcdCopy := kcd.DeepCopy()
 
 	if version != "" {
-		kcd.Status.CurrVersion = version
+		kcdCopy.Status.CurrVersion = version
 	}
 	if status != "" {
-		kcd.Status.CurrStatus = status
+		kcdCopy.Status.CurrStatus = status
 	}
-	if !tm.IsZero() {
-		kcd.Status.CurrStatusTime = metav1.NewTime(tm)
-	}
+	// if !tm.IsZero() {
+	// 	kcdCopy.Status.CurrStatusTime = metav1.NewTime(tm)
+	// }
 	if status == StatusSuccess && version != "" {
-		kcd.Status.SuccessVersion = version
+		kcdCopy.Status.SuccessVersion = version
 	}
 
-	result, err := client.Update(kcd)
+	result, err := client.UpdateStatus(context.TODO(), kcdCopy, metav1.UpdateOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to update KCD spec %s", kcd.Name)
+		return nil, errors.Wrapf(err, "failed to update KCD spec %s", kcdCopy.Name)
 	}
 
 	glog.V(2).Infof("Successfully updated KCD status: %+v", result)

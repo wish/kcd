@@ -1,11 +1,13 @@
 package workload
 
 import (
+	"context"
+
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/wish/kcd/config"
 	kcdv1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -70,7 +72,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	listOpts := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
 	if contains(types, TypeDeployment) {
-		deployments, err := k.cs.AppsV1().Deployments(k.namespace).List(listOpts)
+		deployments, err := k.cs.AppsV1().Deployments(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "deployments")
 		}
@@ -81,7 +83,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypeCronJob) {
-		cronJobs, err := k.cs.BatchV1beta1().CronJobs(k.namespace).List(listOpts)
+		cronJobs, err := k.cs.BatchV1().CronJobs(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "cronJobs")
 		} else {
@@ -93,7 +95,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypeDaemonSet) {
-		daemonSets, err := k.cs.AppsV1().DaemonSets(k.namespace).List(listOpts)
+		daemonSets, err := k.cs.AppsV1().DaemonSets(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "daemonSets")
 		}
@@ -104,7 +106,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypeJob) {
-		jobs, err := k.cs.BatchV1().Jobs(k.namespace).List(listOpts)
+		jobs, err := k.cs.BatchV1().Jobs(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "jobs")
 		}
@@ -115,7 +117,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypePod) {
-		pods, err := k.cs.CoreV1().Pods(k.namespace).List(listOpts)
+		pods, err := k.cs.CoreV1().Pods(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "pods")
 		}
@@ -126,7 +128,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypeReplicaSet) {
-		replicaSets, err := k.cs.AppsV1().ReplicaSets(k.namespace).List(listOpts)
+		replicaSets, err := k.cs.AppsV1().ReplicaSets(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "replicaSets")
 		}
@@ -137,7 +139,7 @@ func (k *K8sProvider) Workloads(kcd *kcdv1.KCD, types ...string) ([]Workload, er
 	}
 
 	if contains(types, TypeStatefulSet) {
-		statefulSets, err := k.cs.AppsV1().StatefulSets(k.namespace).List(listOpts)
+		statefulSets, err := k.cs.AppsV1().StatefulSets(k.namespace).List(context.TODO(), listOpts)
 		if err != nil {
 			return nil, k.handleError(err, "statefulSets")
 		}

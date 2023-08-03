@@ -2,10 +2,11 @@ package events
 
 import (
 	"fmt"
-	"k8s.io/api/admission/v1beta1"
+	"testing"
+
+	v1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
 )
 
 type admissionResponse struct {
@@ -15,7 +16,7 @@ type admissionResponse struct {
 	Patch         string
 }
 
-func (a *admissionResponse) Validate(ar *v1beta1.AdmissionResponse) error {
+func (a *admissionResponse) Validate(ar *v1.AdmissionResponse) error {
 	if a.Allowed != ar.Allowed {
 		return fmt.Errorf("Mismatch in allowed expected=%v actual=%v", a.Allowed, ar.Allowed)
 	}
@@ -45,7 +46,7 @@ func (a *admissionResponse) Validate(ar *v1beta1.AdmissionResponse) error {
 
 func TestMutate(t *testing.T) {
 	tests := []struct {
-		in  *v1beta1.AdmissionRequest
+		in  *v1.AdmissionRequest
 		out *admissionResponse
 	}{
 		// disabled, no path
@@ -53,13 +54,13 @@ func TestMutate(t *testing.T) {
 		// Allowed: true,
 		// StatusMessage: "Patching does not have defined boolean value enable: true or false",
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Object: runtime.RawExtension{
 					Raw: []byte(`{}`),
 				},
 			},
 			out: &admissionResponse{
-				Allowed: true,
+				Allowed:       true,
 				StatusMessage: "Patching does not have defined boolean value enable: true or false",
 			},
 		},
@@ -68,7 +69,7 @@ func TestMutate(t *testing.T) {
 		// admissionResponse:
 		// Allowed: true,
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -129,7 +130,7 @@ func TestMutate(t *testing.T) {
 		// Allowed: true,
 		// StatusMessage: "Patching does not have defined path",
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -181,7 +182,7 @@ func TestMutate(t *testing.T) {
 				},
 			},
 			out: &admissionResponse{
-				Allowed: true,
+				Allowed:       true,
 				StatusMessage: "Patching does not have defined path",
 			},
 		},
@@ -191,7 +192,7 @@ func TestMutate(t *testing.T) {
 		// Allowed: true,
 		// StatusMessage: "Patching enabled is not boolean value",
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -243,7 +244,7 @@ func TestMutate(t *testing.T) {
 				},
 			},
 			out: &admissionResponse{
-				Allowed: true,
+				Allowed:       true,
 				StatusMessage: "Patching enabled is not boolean value",
 			},
 		},
@@ -253,7 +254,7 @@ func TestMutate(t *testing.T) {
 		// Allowed: true,
 		// StatusMessage: "Patching is disabled",
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -305,7 +306,7 @@ func TestMutate(t *testing.T) {
 				},
 			},
 			out: &admissionResponse{
-				Allowed: true,
+				Allowed:       true,
 				StatusMessage: "Patching is disabled",
 			},
 		},
@@ -315,7 +316,7 @@ func TestMutate(t *testing.T) {
 		// Allowed: true,
 		// StatusMessage: "Patching is not successful",
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -367,7 +368,7 @@ func TestMutate(t *testing.T) {
 				},
 			},
 			out: &admissionResponse{
-				Allowed: true,
+				Allowed:       true,
 				StatusMessage: "Patching is not successful",
 			},
 		},
@@ -376,7 +377,7 @@ func TestMutate(t *testing.T) {
 		// admissionResponse:
 		// [{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"951896542015.dkr.ecr.us-west-1.amazonaws.com/contextlogic/hello-service:93ebd365"}]
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",
@@ -437,7 +438,7 @@ func TestMutate(t *testing.T) {
 		// admissionResponse:
 		// [{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"951896542015.dkr.ecr.us-west-1.amazonaws.com/contextlogic/hello-service:93ebd365"}]
 		{
-			in: &v1beta1.AdmissionRequest{
+			in: &v1.AdmissionRequest{
 				Kind: metav1.GroupVersionKind{
 					Group:   "apps",
 					Version: "v1",

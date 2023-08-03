@@ -1,12 +1,13 @@
 package workload
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/golang/glog"
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,7 @@ func newDeployment(deployment *appsv1.Deployment, client goappsv1.DeploymentInte
 
 // curr returns the current state of the deployment.
 func (d *Deployment) curr() (*appsv1.Deployment, error) {
-	dep, err := d.client.Get(d.deployment.Name, metav1.GetOptions{})
+	dep, err := d.client.Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get deployment state")
 	}
@@ -163,8 +164,8 @@ func (d *Deployment) PodTemplateSpec() corev1.PodTemplateSpec {
 // PatchPodSpec implements the Workload interface.
 func (d *Deployment) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
 	// TODO: should we update the deployment with the returned patch version?
-	_, err := d.client.Patch(d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
+	_, err := d.client.Patch(context.TODO(), d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
+		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)), metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for deployment %s", d.deployment.Name)
 	}
@@ -184,7 +185,7 @@ func (d *Deployment) Select(selector map[string]string) ([]TemplateWorkload, err
 
 	var result []TemplateWorkload
 
-	wls, err := d.client.List(listOpts)
+	wls, err := d.client.List(context.TODO(), listOpts)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -228,7 +229,7 @@ func (d *Deployment) SelectOwnPods(pods []corev1.Pod) ([]corev1.Pod, error) {
 }
 
 func (d *Deployment) replicaSetForName(name string) (*appsv1.ReplicaSet, error) {
-	rs, err := d.replicasetClient.Get(name, metav1.GetOptions{})
+	rs, err := d.replicasetClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get replicaset with name %s", name)
 	}
@@ -238,7 +239,7 @@ func (d *Deployment) replicaSetForName(name string) (*appsv1.ReplicaSet, error) 
 
 // NumReplicas implements the TemplateWorkload interface.
 func (d *Deployment) NumReplicas() (int32, error) {
-	dep, err := d.client.Get(d.deployment.Name, metav1.GetOptions{})
+	dep, err := d.client.Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to get current deployment for %s", d.deployment.Name)
 	}
@@ -255,8 +256,8 @@ const deploymentReplicaSetPatchJSON = `
 
 // PatchNumReplicas implements the TemplateWorkload interface.
 func (d *Deployment) PatchNumReplicas(num int32) error {
-	_, err := d.client.Patch(d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(deploymentReplicaSetPatchJSON, num)))
+	_, err := d.client.Patch(context.TODO(), d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
+		[]byte(fmt.Sprintf(deploymentReplicaSetPatchJSON, num)), metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec replicas for deployment %s", d.deployment.Name)
 	}
