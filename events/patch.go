@@ -3,6 +3,10 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/golang/glog"
 	"github.com/mitchellh/mapstructure"
 	"github.com/wish/kcd/gok8s/client/clientset/versioned"
@@ -10,11 +14,7 @@ import (
 	"github.com/wish/kcd/stats"
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"regexp"
-	"strconv"
-	"strings"
 )
-
 
 const (
 	EnabledLabel = "kcd-version-patcher.wish.com/enabled"
@@ -22,7 +22,6 @@ const (
 	KcdAppName = "kcdapp"
 
 	ContainerPatchPath = "/spec/template/spec/containers"
-	
 )
 
 // objectWithMeta allows us to unmarshal just the ObjectMeta of a k8s object
@@ -31,7 +30,7 @@ type objectWithMeta struct {
 }
 
 type containaerData struct {
-	Name string `mapstructure:"name"`
+	Name  string `mapstructure:"name"`
 	Image string `mapstructure:"image"`
 }
 
@@ -113,7 +112,7 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 		kcdName = kcdAppName + "-kcd"
 	}
 	// Retrieve kcd resource
-	kcd, err := customClient.CustomV1().KCDs(newManifest.Namespace).Get(kcdName, metav1.GetOptions{})
+	kcd, err := customClient.CustomV1().KCDs(newManifest.Namespace).Get(context.TODO(), kcdName, metav1.GetOptions{})
 
 	if err != nil {
 		glog.Errorf("Failed to find KCD resource in namespace=%s, name=%s, error=%v", newManifest.Namespace, newManifest.Name, err)
@@ -152,7 +151,6 @@ func Mutate(req *v1beta1.AdmissionRequest, stats stats.Stats, customClient *vers
 			}
 		}
 	}
-
 
 	containerName := kcd.Spec.Container.Name
 	glog.V(4).Infof("KCD resource container name to patch %s", containerName)
@@ -257,7 +255,7 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 	pathToPatch := strings.Join([]string{ContainerPatchPath, idxFlux, "image"}, "/")
 
 	patchOp := patchOperation{
-		Path:  pathToPatch,
+		Path: pathToPatch,
 	}
 
 	p, e := ecr.NewECR(imageRepoFlux, ecr.VersionRegex, stats)
@@ -272,7 +270,7 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 		versions, err := registry.Versions(context.Background(), fluxTag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry using tag=%s", fluxTag)
-			return nil , false
+			return nil, false
 		}
 		version := versions[0]
 		glog.Infof("Got registry versions for container=%s, tag=%s, rolloutVersion=%s", cName, fluxTag, version)
@@ -284,5 +282,3 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 		return patches, true
 	}
 }
-
-

@@ -1,13 +1,14 @@
 package history
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/wish/kcd/stats"
 	"github.com/pkg/errors"
+	"github.com/wish/kcd/stats"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +54,7 @@ func NewProvider(cs kubernetes.Interface, stats stats.Stats) *provider {
 }
 
 func (p *provider) History(namespace, name string) (string, error) {
-	cm, err := p.cs.CoreV1().ConfigMaps(namespace).Get(configName(name), metav1.GetOptions{})
+	cm, err := p.cs.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configName(name), metav1.GetOptions{})
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			return "", nil
@@ -64,10 +65,10 @@ func (p *provider) History(namespace, name string) (string, error) {
 }
 
 func (p *provider) Add(namespace, name string, record *Record) error {
-	cm, err := p.cs.CoreV1().ConfigMaps(namespace).Get(configName(name), metav1.GetOptions{})
+	cm, err := p.cs.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configName(name), metav1.GetOptions{})
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			_, err = p.cs.CoreV1().ConfigMaps(namespace).Create(newRecordConfig(namespace, name, record))
+			_, err = p.cs.CoreV1().ConfigMaps(namespace).Create(context.TODO(), newRecordConfig(namespace, name, record), metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrapf(err, "failed to create kcd history configmap:%s/%s", namespace, name)
 			}
@@ -76,7 +77,7 @@ func (p *provider) Add(namespace, name string, record *Record) error {
 		return errors.Wrapf(err, "failed to get kcd history configmap:%s/%s", namespace, name)
 	}
 
-	_, err = p.cs.CoreV1().ConfigMaps(namespace).Update(updateRecordConfig(cm, record))
+	_, err = p.cs.CoreV1().ConfigMaps(namespace).Update(context.TODO(), updateRecordConfig(cm, record), metav1.UpdateOptions{})
 	if err != nil {
 		glog.Errorf("failed to update kcd update history in configmap: %s/%s", namespace, name)
 		return errors.Wrapf(err, "failed to update kcd update history in configmap: %s/%s", namespace, name)

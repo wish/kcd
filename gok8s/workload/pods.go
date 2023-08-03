@@ -1,11 +1,12 @@
 package workload
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,7 +104,7 @@ func (p *Pod) PodSelector() string {
 
 // PatchPodSpec implements the Workload interface.
 func (p *Pod) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
-	_, err := p.client.Patch(p.pod.ObjectMeta.Name, types.StrategicMergePatchType,
+	_, err := p.client.Patch(context.TODO(), p.pod.ObjectMeta.Name, types.StrategicMergePatchType,
 		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for Pod %s", p.pod.Name)

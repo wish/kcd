@@ -21,11 +21,11 @@ require (
 	github.com/twinj/uuid v1.0.0
 	goji.io v2.0.2+incompatible
 	gopkg.in/stretchr/testify.v1 v1.2.2 // indirect
-	k8s.io/api v0.25.0 //kubernetes-1.10.11
-	k8s.io/apiextensions-apiserver v0.25.0 //kubernetes-1.10.11
-	k8s.io/apimachinery v0.25.0 //kubernetes-1.10.11
-	k8s.io/apiserver v0.25.0 //kubernetes-1.10.11
-	k8s.io/client-go v0.25.0 //kubernetes-1.10.11
+	k8s.io/api v0.25.0 //kubernetes-1.25
+	k8s.io/apiextensions-apiserver v0.25.0 //kubernetes-1.25
+	k8s.io/apimachinery v0.25.0 //kubernetes-1.25
+	k8s.io/apiserver v0.25.0 //kubernetes-1.25
+	k8s.io/client-go v0.25.0 //kubernetes-1.25
 )
 
 replace bitbucket.org/ww/goautoneg => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d

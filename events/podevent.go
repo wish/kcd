@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"os"
 
 	"github.com/golang/glog"
@@ -12,7 +13,7 @@ import (
 // identified by name specified
 func newPodEventRecorder(cs kubernetes.Interface, ns string, podName string) Recorder {
 	var recorder Recorder
-	pod, err := cs.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+	pod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("failed to get pod with name %s for event recorder: %v", podName, err)
 		recorder = &FakeRecorder{}
