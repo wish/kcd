@@ -1,13 +1,15 @@
 package deploy
 
 import (
+	"context"
+
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	k8s "github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -58,7 +60,7 @@ func ActivePodsForTarget(cs kubernetes.Interface, namespace string, target Rollo
 		LabelSelector: target.PodSelector(),
 	}
 
-	podList, err := cs.CoreV1().Pods(namespace).List(listOpts)
+	podList, err := cs.CoreV1().Pods(namespace).List(context.TODO(), listOpts)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to select pods for target %s", target.Name())
 	}

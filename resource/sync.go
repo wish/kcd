@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/wish/kcd/config"
 	"github.com/wish/kcd/deploy"
 	"github.com/wish/kcd/events"
@@ -15,8 +17,6 @@ import (
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/golang/glog"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -286,11 +286,11 @@ func (s *Syncer) syncVersionConfig(version string, next state.State) state.State
 		client := s.workloadProvider.Client()
 		namespace := s.workloadProvider.Namespace()
 
-		cm, err := client.CoreV1().ConfigMaps(namespace).Get(kcd.Spec.Config.Name, metav1.GetOptions{})
+		cm, err := client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), kcd.Spec.Config.Name, metav1.GetOptions{})
 		if err != nil {
 			if k8serr.IsNotFound(err) {
-				_, err = client.CoreV1().ConfigMaps(namespace).Create(
-					newVersionConfig(namespace, kcd.Spec.Config.Name, kcd.Spec.Config.Key, version))
+				_, err = client.CoreV1().ConfigMaps(namespace).Create(context.TODO(),
+					newVersionConfig(namespace, kcd.Spec.Config.Name, kcd.Spec.Config.Key, version), metav1.CreateOptions{})
 				if err != nil {
 					events.FromContext(ctx).Event(events.Warning, "FailedCreateVersionConfigMap", "Failed to create version configmap")
 					return state.Error(errors.Wrapf(err, "failed to create version configmap from %s/%s:%s",
@@ -314,7 +314,7 @@ func (s *Syncer) syncVersionConfig(version string, next state.State) state.State
 		// 		"%s": "%s",
 		// 	},
 		// }`, s.Config.ConfigMap.Key, version)))
-		_, err = client.CoreV1().ConfigMaps(namespace).Update(cm)
+		_, err = client.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 		if err != nil {
 			events.FromContext(ctx).Event(events.Warning, "FailedUpdateVersionConfigMap", "Failed to update version configmap")
 			return state.Error(errors.Wrapf(err, "failed to update version configmap from %s/%s:%s",

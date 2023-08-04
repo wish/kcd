@@ -165,7 +165,7 @@ func (d *Deployment) PodTemplateSpec() corev1.PodTemplateSpec {
 func (d *Deployment) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
 	// TODO: should we update the deployment with the returned patch version?
 	_, err := d.client.Patch(context.TODO(), d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
+		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)), metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for deployment %s", d.deployment.Name)
 	}
@@ -257,7 +257,7 @@ const deploymentReplicaSetPatchJSON = `
 // PatchNumReplicas implements the TemplateWorkload interface.
 func (d *Deployment) PatchNumReplicas(num int32) error {
 	_, err := d.client.Patch(context.TODO(), d.deployment.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(deploymentReplicaSetPatchJSON, num)))
+		[]byte(fmt.Sprintf(deploymentReplicaSetPatchJSON, num)), metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec replicas for deployment %s", d.deployment.Name)
 	}

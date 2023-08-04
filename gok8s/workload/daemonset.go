@@ -9,6 +9,7 @@ import (
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -91,7 +92,7 @@ func (ds *DaemonSet) PodTemplateSpec() corev1.PodTemplateSpec {
 // PatchPodSpec implements the Workload interface.
 func (ds *DaemonSet) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
 	_, err := ds.client.Patch(context.TODO(), ds.daemonSet.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
+		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)), v1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for DaemonSet %s", ds.daemonSet.Name)
 	}
