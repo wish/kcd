@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 	conf "github.com/wish/kcd/config"
 	"github.com/wish/kcd/events"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
@@ -20,8 +23,6 @@ import (
 	"github.com/wish/kcd/signals"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/stats"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -164,7 +165,7 @@ func newKCDSyncCommand(root *regRoot) *cobra.Command {
 
 		resourceProvider := resource.NewK8sProvider(params.namespace, customCS, workloadProvider)
 
-		kcd, err := customCS.CustomV1().KCDs(params.namespace).Get(params.kcdName, metav1.GetOptions{})
+		kcd, err := customCS.CustomV1().KCDs(params.namespace).Get(context.TODO(), params.kcdName, metav1.GetOptions{})
 		if err != nil {
 			scStatus = 2
 			glog.Errorf("Failed to find CV resource in namespace=%s, name=%s, error=%v", params.namespace, params.kcdName, err)
