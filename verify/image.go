@@ -121,7 +121,7 @@ func (iv *ImageVerifier) getImage(ctx context.Context, spec kcd1.VerifySpec) (st
 		return "", errors.Wrapf(err, "failed to get registry for %s", spec.Image)
 	}
 
-	versions, err := registry.Versions(ctx, spec.Tag)
+	versions, _, err := registry.Versions(ctx, spec.Tag)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get version from registry for %+v", spec)
 	}

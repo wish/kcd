@@ -84,15 +84,15 @@ func (vp *V2Provider) RegistryFor(imageRepo string) (kcdregistry.Registry, error
 }
 
 // Versions implements the Registry interface.
-func (vp *V2Provider) Versions(ctx context.Context, tag string) ([]string, error) {
+func (vp *V2Provider) Versions(ctx context.Context, tag string) (kcdregistry.Versions, kcdregistry.Digest, error) {
 	tags := make([]string, 0, 5)
 	newVersion, err := vp.getDigest(tag)
 	if err != nil {
 		vp.opts.Stats.IncCount("registry.failure", vp.repository)
-		return tags, errors.Errorf("No version found for tag %s", tag)
+		return tags, &newVersion, errors.Errorf("No version found for tag %s", tag)
 	}
 	tags = append(tags, newVersion)
-	return tags, nil
+	return tags, &newVersion, nil
 }
 
 // Add adds list of tags to the image identified with version

@@ -269,13 +269,13 @@ func patchForContainer(cName string, current, replacement Record, stats stats.St
 		glog.Errorf("Failed to build registry for image repo: %v", imageRepo)
 		return nil, false
 	} else {
-		versions, err := registry.Versions(context.Background(), fluxTag)
+		versions, digest, err := registry.Versions(context.Background(), fluxTag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry using tag=%s", fluxTag)
 			return nil , false
 		}
 		version := versions[0]
-		glog.Infof("Got registry versions for container=%s, tag=%s, rolloutVersion=%s", cName, fluxTag, version)
+		glog.Infof("Got registry versions for container=%s, tag=%s, rolloutVersion=%s, imageDigest=%s", cName, fluxTag, version, *digest)
 
 		patchOp.Value = imageDataFlux[0] + ":" + version
 		glog.Infof("Replacing path=%v old tag=%v to patched version=%v", pathToPatch, fluxTag, version)

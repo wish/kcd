@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/wish/kcd/config"
 	"github.com/wish/kcd/deploy"
 	"github.com/wish/kcd/events"
@@ -15,8 +17,6 @@ import (
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/golang/glog"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,8 +98,9 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		// refresh kcd resource state
 		s.kcd = kcd
-
-		versions, err := s.registry.Versions(ctx, s.kcd.Spec.Tag)
+		
+		// get digest from ECR Describe Image in order to have more strict image version validation with Robbie 
+		versions, digest, err := s.registry.Versions(ctx, s.kcd.Spec.Tag)
 		if err != nil {
 			glog.Errorf("Syncer failed to get version from registry, kcd=%s, tag=%s: %v", s.kcd.Name, kcd.Spec.Tag, err)
 			s.options.Recorder.Event(events.Warning, "KCDSyncFailed", "Failed to get versions from registry")
@@ -108,7 +109,7 @@ func (s *Syncer) initialState() state.StateFunc {
 
 		version := versions[0]
 		if glog.V(4) {
-			glog.V(4).Infof("Got registry versions for kcd=%s, tag=%s, versions=%v, rolloutVersion=%s", s.kcd.Name, kcd.Spec.Tag, strings.Join(versions, ", "), version)
+			glog.V(4).Infof("Got registry versions for kcd=%s, tag=%s, versions=%v, rolloutVersion=%s, imageDigest=%s", s.kcd.Name, kcd.Spec.Tag, strings.Join(versions, ", "), version, *digest)
 		}
 
 		deployer, err := deploy.New(s.workloadProvider, s.registryProvider, s.kcd, versions[0])
@@ -128,7 +129,21 @@ func (s *Syncer) initialState() state.StateFunc {
 			return state.None()
 		}
 
-		glog.V(4).Infof("Creating rollout state for kcd=%s", s.kcd.Name)
+		process, err = signOffRetryalbe(&robbieSignOffRequest{
+			KcdName:      s.kcd.GetName(),
+			KcdNameSpace: s.kcd.GetNamespace(),
+			KcdLables:    s.kcd.GetLabels(),
+			KcdTag:       s.kcd.Spec.Tag,
+			KcdImageRepo: s.kcd.Spec.ImageRepo,
+			Versions:     versions,
+			Digest:       digest,
+		}, RobbieEndpoint)
+
+		if err != nil || !process {
+			glog.V(4).Infof("Fail to acquire sign-off by Robbie, so not attempting %s rollout of version %s: %+v", s.kcd.Name, version, s.kcd.Status)
+			return state.None()
+		}
+		glog.V(4).Infof("Successfully acquire sign-off by Robbie and creating rollout state for kcd=%s", s.kcd.Name)
 
 		syncState := s.verify(version,
 			s.updateRolloutStatus(version, StatusProgressing,
@@ -371,3 +386,4 @@ func (s *Syncer) addHistory(deployer deploy.Deployer, version string, next state
 		return state.Single(next)
 	}
 }
+

@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+type Versions []string
+type Digest *string
+
 // ProviderByRepo generates Type based on image ARN
 func ProviderByRepo(repoARN string) string {
 	if strings.Contains(repoARN, "amazonaws.com") {
@@ -24,7 +27,7 @@ type Registry interface {
 	// on each commit and a commit that does not change the resulting image is made
 	// and is tagged. In this case, the syncers check all the tags for the existing
 	// version before determining if a rollout should occur.
-	Versions(ctx context.Context, tag string) ([]string, error)
+	Versions(ctx context.Context, tag string) (Versions, Digest, error)
 }
 
 // Tagger provides capability of adding/removing environment tags on ECR
