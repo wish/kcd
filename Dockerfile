@@ -8,7 +8,7 @@ ARG TARGETOS TARGETARCH
 RUN export GO111MODULE=on && GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-w -s" -o /go/bin/kcd
 
 #Actual Image
-FROM alpine:3.13.0
+FROM alpine:3.13
 
 VOLUME /go/src
 
