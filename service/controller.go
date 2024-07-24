@@ -392,10 +392,6 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
-	// default value: kops.k8s.io/instancegroup, to ensure there is no breaking effect to legacy env
-	// for new stage env, it should be node.wish.com/instancegroup from environment variable NODE_SELECTOR 
-	nodeSelector := getEnv("NODE_SELECTOR", "kops.k8s.io/instancegroup")
-	glog.V(1).Info("Getting node selector label=%s", nodeSelector)
 	
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -453,10 +449,6 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 										},
 									},
 								},
-								{
-									Name: "NODE_SELECTOR",
-									Value: nodeSelector,
-								},
 							},
 							LivenessProbe: &corev1.Probe{
 								PeriodSeconds:       int32(livenessSeconds),
@@ -476,9 +468,6 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								},
 							},
 						},
-					},
-					NodeSelector: map[string]string{
-						nodeSelector: "kcd",
 					},
 				},
 			},
