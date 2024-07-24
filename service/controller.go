@@ -1,22 +1,22 @@
 package kcd
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	conf "github.com/wish/kcd/config"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	clientset "github.com/wish/kcd/gok8s/client/clientset/versioned"
 	scheme "github.com/wish/kcd/gok8s/client/clientset/versioned/scheme"
 	informers "github.com/wish/kcd/gok8s/client/informers/externalversions"
 	customlister "github.com/wish/kcd/gok8s/client/listers/custom/v1"
-	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -118,14 +118,12 @@ func NewCVController(configMapKey, kcdImgRepo string,
 		opts:     opts,
 	}
 
-	glog.V(1).Info("Setting up event handlers in container version controller")
+	glog.V(1).Info("Setting up event handlers in container version controller(kcd)")
 
 	kcdcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: kcdc.enqueue,
 		UpdateFunc: func(old, new interface{}) {
-			if !reflect.DeepEqual(old, new) {
-				kcdc.enqueue(new)
-			}
+			kcdc.enqueue(new)
 		},
 		DeleteFunc: kcdc.dequeueCV,
 	})
@@ -358,7 +356,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 	_, err := c.deployLister.Deployments(namespace).Get(syncDeployName(kcd.Name))
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(c.newKCDSyncDeployment(kcd, version))
+			_, err = c.k8sCS.AppsV1().Deployments(namespace).Create(context.TODO(), c.newKCDSyncDeployment(kcd, version), metav1.CreateOptions{})
 			if err != nil {
 				c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedCreateKCDSync", "Failed to create DR Sync deployment")
 				return errors.Wrapf(err, "Failed to create DR Sync deployment %s", key)
@@ -368,7 +366,7 @@ func (c *CVController) syncDeployNames(namespace, key, version string, kcd *kcd1
 		return errors.Wrapf(err, "Failed to find DR Sync deployment %s", key)
 	}
 
-	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(c.newKCDSyncDeployment(kcd, version))
+	_, err = c.k8sCS.AppsV1().Deployments(namespace).Update(context.TODO(), c.newKCDSyncDeployment(kcd, version), metav1.UpdateOptions{})
 	if err != nil {
 		c.recorder.Event(kcd, corev1.EventTypeWarning, "FailedUpdateKCDSync", "Failed to update DR Sync deployment")
 		return errors.Wrapf(err, "Failed to update DR Sync deployment %s", key)
@@ -392,7 +390,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 		"app":        "registry-syncer",
 		"controller": kcd.Name,
 	}
-	
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dName,
@@ -420,8 +418,9 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  fmt.Sprintf("%s-container", dName),
-							Image: fmt.Sprintf("%s:%s", c.kcdImgRepo, version),
+							Name:            fmt.Sprintf("%s-container", dName),
+							Image:           fmt.Sprintf("%s:%s", c.kcdImgRepo, version),
+							ImagePullPolicy: "Always",
 							Args: []string{
 								"registry",
 								"sync",
@@ -455,7 +454,7 @@ func (c *CVController) newKCDSyncDeployment(kcd *kcd1.KCD, version string) *apps
 								InitialDelaySeconds: int32(10),
 								TimeoutSeconds:      int32(5),
 								FailureThreshold:    int32(2),
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{
 											"kcd", "registry", "sync", "status",
@@ -498,7 +497,7 @@ func syncDeployName(kcdName string) string {
 
 // fetchVersion gets container version from config map as specified in configMapKey
 func (c *CVController) fetchVersion() (string, error) {
-	cm, err := c.k8sCS.CoreV1().ConfigMaps(c.config.ns).Get(c.config.name, metav1.GetOptions{})
+	cm, err := c.k8sCS.CoreV1().ConfigMaps(c.config.ns).Get(context.TODO(), c.config.name, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to get config for version for sync service")
 	}
@@ -519,7 +518,7 @@ func specVersion(kcd *kcd1.KCD) string {
 	return fmt.Sprintf("%x", result)
 }
 
-// customized get environment variable function with fallback default value 
+// customized get environment variable function with fallback default value
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value

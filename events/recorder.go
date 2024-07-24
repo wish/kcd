@@ -63,5 +63,6 @@ func (sr *SimpleRecorder) Eventf(eventtype, reason, messageFmt string, args ...i
 
 // Event implements EventRecorder.
 func (sr *SimpleRecorder) PastEventf(timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-	sr.recorder.PastEventf(sr.object, timestamp, eventtype, reason, messageFmt, args...)
+	annotations := map[string]string{}
+	sr.recorder.AnnotatedEventf(sr.object, annotations, eventtype, reason, messageFmt, args...)
 }

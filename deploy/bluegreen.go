@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/wish/kcd/gok8s/workload"
 	"github.com/wish/kcd/registry"
 	"github.com/wish/kcd/state"
 	"github.com/wish/kcd/verify"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -137,7 +137,7 @@ func (bgd *BlueGreenDeployer) AsState(next state.State) state.State {
 
 // getService returns the service with the given name.
 func (bgd *BlueGreenDeployer) getService(serviceName string) (*corev1.Service, error) {
-	service, err := bgd.cs.CoreV1().Services(bgd.namespace).Get(serviceName, metav1.GetOptions{})
+	service, err := bgd.cs.CoreV1().Services(bgd.namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get service with name %s", serviceName)
 	}
@@ -237,7 +237,7 @@ func (bgd *BlueGreenDeployer) updateServiceSelector(serviceName string, target T
 		glog.V(2).Infof("Updating service %s with selectors %v", serviceName, service.Spec.Selector)
 
 		// TODO: is update appropriate?
-		if _, err := bgd.cs.CoreV1().Services(bgd.namespace).Update(service); err != nil {
+		if _, err := bgd.cs.CoreV1().Services(bgd.namespace).Update(context.TODO(), service, metav1.UpdateOptions{}); err != nil {
 			return state.Error(errors.Wrapf(err, "failed to update test service %s while processing blue-green deployment for %s",
 				service.Name, bgd.kcd.Name))
 		}

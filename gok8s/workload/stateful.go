@@ -1,13 +1,15 @@
 package workload
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	"github.com/pkg/errors"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -89,8 +91,8 @@ func (ss *StatefulSet) PodTemplateSpec() corev1.PodTemplateSpec {
 
 // PatchPodSpec implements the Workload interface.
 func (ss *StatefulSet) PatchPodSpec(kcd *kcd1.KCD, container corev1.Container, version string) error {
-	_, err := ss.client.Patch(ss.statefulSet.ObjectMeta.Name, types.StrategicMergePatchType,
-		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)))
+	_, err := ss.client.Patch(context.TODO(), ss.statefulSet.ObjectMeta.Name, types.StrategicMergePatchType,
+		[]byte(fmt.Sprintf(podTemplateSpecJSON, container.Name, kcd.Spec.ImageRepo, version)), metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to patch pod template spec container for StatefulSet %s", ss.statefulSet.Name)
 	}

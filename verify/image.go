@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
-	"github.com/wish/kcd/registry"
-	"github.com/wish/kcd/state"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
+	kcd1 "github.com/wish/kcd/gok8s/apis/custom/v1"
+	"github.com/wish/kcd/registry"
+	"github.com/wish/kcd/state"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -99,7 +99,7 @@ func (iv *ImageVerifier) createPod(ctx context.Context) (*corev1.Pod, error) {
 		},
 	}
 
-	p, err := iv.client.Create(pod)
+	p, err := iv.client.Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create pod with name=%s, image=%s", name, image)
 	}
@@ -133,7 +133,7 @@ func (iv *ImageVerifier) getImage(ctx context.Context, spec kcd1.VerifySpec) (st
 
 func (iv *ImageVerifier) waitForPodState(name string) state.StateFunc {
 	return func(ctx context.Context) (state.States, error) {
-		pod, err := iv.client.Get(name, metav1.GetOptions{})
+		pod, err := iv.client.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return state.Error(errors.Wrapf(err, "failed to get pod with name %s", name))
 		}
