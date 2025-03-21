@@ -96,7 +96,7 @@ func (ep *Provider) RegistryFor(imageRepo string) (registry.Registry, error) {
 }
 
 // Version implements the Registry interface.
-func (ep *Provider) Versions(ctx context.Context, tag string) ([]string, error) {
+func (ep *Provider) Versions(ctx context.Context, tag string) (registry.Versions, registry.Digest, error) {
 	// TODO: parameterize timeout
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, time.Second*15)
@@ -119,26 +119,27 @@ func (ep *Provider) Versions(ctx context.Context, tag string) ([]string, error) 
 	result, err := ep.ecr.DescribeImagesWithContext(ctx, req)
 	if err != nil {
 		glog.Errorf("Failed to get ECR: %v", err)
-		return nil, errors.Wrap(err, "failed to get ecr")
+		return nil, nil, errors.Wrap(err, "failed to get ecr")
 	}
 	if len(result.ImageDetails) != 1 {
 		ep.stats.Event(fmt.Sprintf("registry.%s.sync.failure", ep.repoName),
 			fmt.Sprintf("Failed to sync with ECR for tag %s", tag), "", "error",
 			time.Now().UTC(), tag)
-		return nil, errors.Errorf("Bad state: More than one image was tagged with %s", tag)
+		return nil, nil, errors.Errorf("Bad state: More than one image was tagged with %s", tag)
 	}
 
 	img := result.ImageDetails[0]
 
 	versions := ep.currentVersions(img)
+	digest := img.ImageDigest
 	if len(versions) == 0 {
 		ep.stats.IncCount("registry.failure", ep.repoName)
-		return nil, errors.Errorf("No version found for tag %s", tag)
+		return nil, nil, errors.Errorf("No version found for tag %s", tag)
 	}
 
 	glog.V(2).Infof("Got currentVersions=%s from ECR", strings.Join(versions, ", "))
 
-	return versions, nil
+	return versions, digest, nil
 }
 
 // Add a list of tags to the image identified with version
